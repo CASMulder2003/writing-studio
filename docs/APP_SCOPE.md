@@ -16,8 +16,10 @@ Notes can stand alone or belong to a chapter; either kind remains visible in the
 Notebook. Notes have planning status and support attached images and simple drawings.
 The manuscript also supports images.
 
-Project tabs represent open projects, not the entire library. Closing a tab preserves
-its data. The + button lets the writer choose an existing project or create one.
+The project switcher opens the saved-project library and supports creating or closing
+a project. Projects open in Outline. Chapter tabs represent open editors; closing a
+tab preserves its manuscript. Each project keeps its own open tabs, and breadcrumbs
+provide a direct return to the outline.
 
 Automatic local saving, manual chapter versions, recovery of removed chapters,
 complete JSON backups, and validated imports protect the writing workflow. Selected

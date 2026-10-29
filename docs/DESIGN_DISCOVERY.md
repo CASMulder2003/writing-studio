@@ -5,10 +5,11 @@ Neutral paper surfaces, muted green controls, and serif headings keep the writin
 area visually calm. Manuscript text uses a compact 16 px serif style and generous
 line spacing.
 
-The left sidebar contains the manuscript order and the four main views: Outline,
-Manuscript, Characters, and Notebook. Manuscript remains a focused chapter editor;
-a persistent chapter picker and labelled Previous/Next controls make navigation
-visible. Read whole book opens a continuous draft with jump-to-chapter and edit controls.
+The left sidebar contains the chapter list and three main views: Outline,
+Characters, and Notebook. Projects open in Outline. Opening a chapter from its
+card or the sidebar opens the editor in a closable chapter tab. The breadcrumb
+links back to Outline and includes a chapter picker; adjacent arrows switch chapters.
+Read book opens a continuous draft with jump-to-chapter and edit controls.
 The optional right panel shows chapter summaries,
 attached notes, character information, and saved versions. On smaller screens it
 opens as an overlay. Focus mode hides both sidebars and the project header.
@@ -23,8 +24,13 @@ Escape dismisses one active layer at a time: dialogs, mobile navigation, the con
 panel, focus mode, or the whole-book reading view. Dialogs return keyboard focus to their opener. Within the
 project chooser, Escape returns from the new-project form to existing projects first.
 
-Project tabs are closable, and the library remains accessible through +. Closing all
-tabs shows the library. Closed projects are still saved and can be reopened.
+The project name at the top opens the project library, with options to open, create,
+or close a project. Each project remembers its own chapter tabs. Closing a chapter
+tab leaves its manuscript intact, selects a neighbouring tab, or returns to Outline
+when the last tab closes. The outline remembers its scroll position during navigation.
+The chapter list takes the remaining sidebar height and scrolls independently, with
+a thin scrollbar and no scroll chaining into the writing area. Opening a chapter
+keeps its list entry and tab visible.
 
 Counts describe the current work rather than setting a target. The interface avoids
 daily-goal slogans, estimated reading times, and a separate scene hierarchy.

@@ -6,11 +6,15 @@ export function ProjectChooser({
   onOpen,
   onCreate,
   readOnly,
+  activeProjectId,
+  onClose,
 }: {
   books: Book[];
   onOpen: (id: string) => void;
   onCreate: (title: string, author: string) => void;
   readOnly: boolean;
+  activeProjectId?: string;
+  onClose?: () => void;
 }) {
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState('');
@@ -102,6 +106,11 @@ export function ProjectChooser({
               </span>
               <span>
                 <strong>{book.title || 'Untitled project'}</strong>
+                {book.id === activeProjectId && (
+                  <small className="current-project-label">
+                    Current project
+                  </small>
+                )}
                 <small>
                   {book.chapters.length} chapters ·{' '}
                   {bookWords(book).toLocaleString()} words · ~
@@ -115,6 +124,13 @@ export function ProjectChooser({
             </button>
           ))}
       </div>
+      {onClose && (
+        <div className="modal-footer">
+          <button className="text-button" onClick={onClose}>
+            Close current project
+          </button>
+        </div>
+      )}
     </div>
   );
 }

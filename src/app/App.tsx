@@ -14,6 +14,7 @@ import {
   Download,
   Upload,
   ChevronRight,
+  ChevronDown,
   ChevronLeft,
   ArrowUp,
   ArrowDown,
@@ -67,6 +68,8 @@ import { Writer } from '../features/Writer';
 import { DrawingPad } from '../features/DrawingPad';
 import { ProjectChooser } from '../features/ProjectChooser';
 import { Manuscript } from '../features/Manuscript';
+import { ChapterTabs } from '../features/ChapterTabs';
+import { useChapterTabs } from '../features/useChapterTabs';
 import { readImage } from '../shared/images';
 
 type View = 'write' | 'outline' | 'characters' | 'notes' | 'read';
@@ -191,13 +194,18 @@ export default function App() {
           .map((id) => library.books.find((b) => b.id === id))
           .filter((b): b is Book => Boolean(b));
   const book = visibleBooks.find((b) => b.id === activeBook) || visibleBooks[0];
+  const chapterTabs = useChapterTabs(book);
   const [activeScene, setActiveScene] = useState('');
   const chapter =
     book?.chapters.find((c) => c.scenes.some((s) => s.id === activeScene)) ||
     book?.chapters[0];
   const scene =
     chapter?.scenes.find((s) => s.id === activeScene) || chapter?.scenes[0];
-  const [view, setView] = useState<View>('write');
+  const [view, setView] = useState<View>('outline');
+  const [readOrigin, setReadOrigin] = useState<'outline' | 'write'>('outline');
+  const sidebarList = useRef<HTMLDivElement>(null);
+  const outlineScroll = useRef<HTMLDivElement>(null);
+  const outlinePositions = useRef<Record<string, number>>({});
   const [manuscriptJump, setManuscriptJump] = useState({ id: '', request: 0 });
   const editorScroll = useRef<HTMLDivElement>(null);
   const [inspector, setInspector] = useState(() => window.innerWidth > 1100);
@@ -211,6 +219,7 @@ export default function App() {
   const navigationToggle = useRef<HTMLButtonElement>(null);
   const contextToggle = useRef<HTMLButtonElement>(null);
   const readingToggle = useRef<HTMLButtonElement>(null);
+  const outlineLink = useRef<HTMLButtonElement>(null);
   const [modal, setModal] = useState<ModalName>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formAuthor, setFormAuthor] = useState('');
@@ -232,6 +241,27 @@ export default function App() {
     if (view === 'write' && editorScroll.current)
       editorScroll.current.scrollTop = 0;
   }, [scene?.id, view]);
+  useEffect(() => {
+    if (view === 'outline' && outlineScroll.current && book)
+      outlineScroll.current.scrollTop = outlinePositions.current[book.id] || 0;
+  }, [view, book?.id]);
+  useEffect(() => {
+    if (view !== 'write' && view !== 'read') return;
+    const list = sidebarList.current;
+    const item = list?.querySelector<HTMLElement>('.chapter-item.active');
+    if (!list || !item) return;
+    const revealSelected = () => {
+      const top = item.offsetTop;
+      if (top < list.scrollTop) list.scrollTop = top;
+      else if (top + item.offsetHeight > list.scrollTop + list.clientHeight)
+        list.scrollTop = top + item.offsetHeight - list.clientHeight;
+    };
+    revealSelected();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(revealSelected);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [chapter?.id, view, book?.id]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(''), 4500);
@@ -277,7 +307,7 @@ export default function App() {
       } else if (view === 'read') {
         e.preventDefault();
         e.stopPropagation();
-        setView('write');
+        setView(readOrigin);
         readingToggle.current?.focus({ preventScroll: true });
       } else if (view === 'write' && inspector) {
         e.preventDefault();
@@ -293,7 +323,7 @@ export default function App() {
     // Handle workspace dismissal before the rich-text editor's Escape binding.
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
-  }, [focus, modal, mobileNav, view, inspector]);
+  }, [focus, modal, mobileNav, view, inspector, readOrigin]);
   const mutate = (fn: (b: Book) => Book) => {
     if (bookRef.current && !library.readOnly) {
       const updated = fn(bookRef.current);
@@ -322,9 +352,29 @@ export default function App() {
     }));
   };
   const chooseScene = (sid: string) => {
+    const targetBook = bookRef.current;
+    const target = targetBook?.chapters.find((c) =>
+      c.scenes.some((s) => s.id === sid),
+    );
+    if (targetBook && target) chapterTabs.open(targetBook.id, target.id);
     setActiveScene(sid);
     setView('write');
     setMobileNav(false);
+  };
+  const showOutline = () => {
+    setView('outline');
+    setMobileNav(false);
+  };
+  const closeChapterTab = (chapterId: string) => {
+    const next = chapterTabs.close(chapterId);
+    if (chapterId === chapter?.id && view === 'write') {
+      const nextChapter = book?.chapters.find((c) => c.id === next);
+      if (nextChapter) setActiveScene(nextChapter.scenes[0].id);
+      else {
+        showOutline();
+        outlineLink.current?.focus();
+      }
+    }
   };
   const chooseChapter = (target: Chapter) => {
     if (view === 'read') {
@@ -347,15 +397,14 @@ export default function App() {
     setModal(name);
   };
   const openProject = (projectId: string) => {
-    setOpenBookIds((ids) => {
-      const current = ids === null ? visibleBooks.map((b) => b.id) : ids;
-      return current.includes(projectId) ? current : [...current, projectId];
-    });
+    setOpenBookIds([projectId]);
     setActiveBook(projectId);
     setActiveScene('');
     setCharacterId('');
     setNoteId('');
-    setView('write');
+    setView('outline');
+    setMobileNav(false);
+    setFocus(false);
     setModal(null);
   };
   const createProject = (title: string, author: string) => {
@@ -363,15 +412,14 @@ export default function App() {
     library.update(next);
     openProject(next.id);
   };
-  const closeProject = (projectId: string) => {
-    const current = visibleBooks.map((b) => b.id);
-    const index = current.indexOf(projectId);
-    const next = current.filter((id) => id !== projectId);
-    setOpenBookIds(next);
-    if (book?.id === projectId) {
-      setActiveBook(next[Math.min(index, next.length - 1)] || '');
-      setActiveScene('');
-    }
+  const closeProject = () => {
+    setOpenBookIds([]);
+    setActiveBook('');
+    setActiveScene('');
+    setView('outline');
+    setModal(null);
+    setMobileNav(false);
+    setFocus(false);
   };
   const openCharacter = (cid: string) => {
     setCharacterId(cid);
@@ -537,7 +585,7 @@ export default function App() {
         <main>
           <span className="eyebrow">YOUR LIBRARY</span>
           <h1>Open a project</h1>
-          <p>Closed tabs stay saved here.</p>
+          <p>Choose a saved project or create a new one.</p>
           <ProjectChooser
             books={library.books}
             onOpen={openProject}
@@ -583,7 +631,6 @@ export default function App() {
     : [];
   const navItems: { id: View; label: string; icon: typeof BookOpen }[] = [
     { id: 'outline', label: 'Outline', icon: LayoutGrid },
-    { id: 'write', label: 'Manuscript', icon: BookOpen },
     { id: 'characters', label: 'Characters', icon: Users },
     { id: 'notes', label: 'Notebook', icon: NotebookPen },
   ];
@@ -739,44 +786,26 @@ export default function App() {
           </span>
           <span>Writing Studio</span>
         </div>
-        <div className="project-tabs" role="tablist" aria-label="Open projects">
-          {visibleBooks.map((project) => (
-            <div
-              key={project.id}
-              className={`project-tab ${project.id === book.id ? 'active' : ''}`}
-            >
-              <button
-                role="tab"
-                aria-selected={project.id === book.id}
-                title={project.title}
-                onClick={() => {
-                  setActiveBook(project.id);
-                  setActiveScene('');
-                  setCharacterId('');
-                  setNoteId('');
-                }}
-              >
-                <BookOpen size={14} />
-                <span>{project.title || 'Untitled project'}</span>
-              </button>
-              <button
-                className="close-project"
-                aria-label={'Close ' + (project.title || 'Untitled project')}
-                onClick={() => closeProject(project.id)}
-              >
-                <X size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
         <button
-          className="icon-button project-plus"
-          aria-label="Open or create project"
-          title="Open or create project"
+          className="project-switcher"
+          aria-label="Switch project"
+          aria-haspopup="dialog"
+          title={`Switch project: ${book.title}`}
           onClick={() => open('library')}
         >
-          <Plus size={18} />
+          <BookOpen size={16} />
+          <span>{book.title || 'Untitled project'}</span>
+          <ChevronDown size={14} />
         </button>
+        <ChapterTabs
+          chapters={chapterTabs.ids.map((id) => ({
+            chapter: book.chapters.find((c) => c.id === id)!,
+            number: book.chapters.findIndex((c) => c.id === id) + 1,
+          }))}
+          activeId={view === 'write' ? chapter.id : undefined}
+          onOpen={(target) => chooseScene(target.scenes[0].id)}
+          onClose={closeChapterTab}
+        />
         <div className="header-actions">
           <span
             className={`save-status ${library.error ? 'save-error' : ''}`}
@@ -830,21 +859,24 @@ export default function App() {
         </div>
       )}
       <div className="app-body">
+        {mobileNav && (
+          <button
+            className="sidebar-scrim"
+            aria-label="Close navigation"
+            onClick={() => {
+              setMobileNav(false);
+              navigationToggle.current?.focus();
+            }}
+          />
+        )}
         <aside className="sidebar">
-          <div className="sidebar-top">
-            <div className="eyebrow">YOUR BOOK</div>
-            <button className="book-title" onClick={() => open('settings')}>
-              <span>{book.title || 'Untitled book'}</span>
-              <Settings2 size={15} />
-            </button>
-            <p className="book-subtitle">{book.subtitle}</p>
-          </div>
           <nav className="main-nav" aria-label="Workspace">
             {navItems.map((n) => (
               <button
                 key={n.id}
                 className={
-                  view === n.id || (n.id === 'write' && view === 'read')
+                  view === n.id ||
+                  (n.id === 'outline' && (view === 'write' || view === 'read'))
                     ? 'selected'
                     : ''
                 }
@@ -890,7 +922,17 @@ export default function App() {
               <Plus size={16} />
             </button>
           </div>
-          <div className="sidebar-list">
+          <div
+            className="sidebar-list"
+            ref={sidebarList}
+            aria-label={
+              view === 'characters'
+                ? 'Character list'
+                : view === 'notes'
+                  ? 'Note list'
+                  : 'Chapter list'
+            }
+          >
             {view === 'characters'
               ? book.characters.map((c) => (
                   <button
@@ -939,6 +981,12 @@ export default function App() {
                         </span>
                         <button
                           className="chapter-select"
+                          aria-current={
+                            chapter.id === c.id &&
+                            (view === 'write' || view === 'read')
+                              ? 'page'
+                              : undefined
+                          }
                           onClick={() => chooseChapter(c)}
                         >
                           <span className="chapter-number">
@@ -956,16 +1004,6 @@ export default function App() {
                     </div>
                   ))}
           </div>
-          {view !== 'characters' && view !== 'notes' && (
-            <button
-              className="add-chapter"
-              disabled={readOnly}
-              onClick={() => open('newChapter')}
-            >
-              <Plus size={15} />
-              Add chapter
-            </button>
-          )}
           <div className="sidebar-bottom">
             <div
               className="book-statistics"
@@ -994,6 +1032,14 @@ export default function App() {
               </button>
               <button
                 className="icon-button"
+                aria-label="Book details"
+                title="Book details"
+                onClick={() => open('settings')}
+              >
+                <Settings2 size={16} />
+              </button>
+              <button
+                className="icon-button"
                 aria-label="Writing Studio help"
                 onClick={() => open('help')}
               >
@@ -1004,7 +1050,7 @@ export default function App() {
         </aside>
         <main className="workspace">
           <div className="workspace-bar">
-            <div className="workspace-crumb">
+            <nav className="workspace-crumb" aria-label="Breadcrumb">
               <button
                 ref={navigationToggle}
                 className="icon-button nav-toggle"
@@ -1014,41 +1060,114 @@ export default function App() {
               >
                 <BookOpen size={18} />
               </button>
-              <span>
-                {view === 'write' || view === 'read'
-                  ? 'Manuscript'
-                  : view === 'outline'
-                    ? 'Book outline'
-                    : view === 'characters'
-                      ? 'Character library'
-                      : 'Notebook'}
-              </span>
-              <ChevronRight size={13} />
-              <strong>
-                {view === 'write'
-                  ? chapter.title
-                  : view === 'read'
-                    ? 'Complete book'
-                    : book.title}
-              </strong>
-            </div>
+              <button
+                ref={outlineLink}
+                className="breadcrumb-link"
+                onClick={showOutline}
+                aria-current={view === 'outline' ? 'page' : undefined}
+              >
+                Outline
+              </button>
+              {view !== 'outline' && (
+                <ChevronRight size={13} aria-hidden="true" />
+              )}
+              {view === 'write' ? (
+                <select
+                  className="breadcrumb-chapters"
+                  aria-label="Go to chapter"
+                  value={chapter.id}
+                  onChange={(event) => {
+                    const target = book.chapters.find(
+                      (c) => c.id === event.target.value,
+                    );
+                    if (target) chooseChapter(target);
+                  }}
+                >
+                  {book.chapters.map((c, index) => (
+                    <option key={c.id} value={c.id}>
+                      {index + 1}. {c.title || 'Untitled chapter'}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                view !== 'outline' && (
+                  <span aria-current="page">
+                    {view === 'read'
+                      ? 'Whole book'
+                      : view === 'characters'
+                        ? 'Characters'
+                        : 'Notebook'}
+                  </span>
+                )
+              )}
+            </nav>
             <div className="workspace-actions">
               {(view === 'write' || view === 'read') && (
+                <div
+                  className="chapter-stepper"
+                  aria-label="Chapter navigation"
+                >
+                  <button
+                    className="icon-button"
+                    aria-label="Previous chapter"
+                    title="Previous chapter"
+                    disabled={chapterIndex === 0}
+                    onClick={() =>
+                      chooseChapter(book.chapters[chapterIndex - 1])
+                    }
+                  >
+                    <ChevronLeft size={17} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Next chapter"
+                    title="Next chapter"
+                    disabled={chapterIndex === book.chapters.length - 1}
+                    onClick={() =>
+                      chooseChapter(book.chapters[chapterIndex + 1])
+                    }
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
+              )}
+              {(view === 'write' || view === 'read' || view === 'outline') && (
                 <button
                   ref={readingToggle}
                   className="text-button reading-toggle"
+                  aria-label={
+                    view === 'read'
+                      ? readOrigin === 'outline'
+                        ? 'Back to outline'
+                        : 'Back to chapter'
+                      : 'Read book'
+                  }
+                  title={
+                    view === 'read'
+                      ? readOrigin === 'outline'
+                        ? 'Back to outline'
+                        : 'Back to chapter'
+                      : 'Read book'
+                  }
                   onClick={() => {
-                    if (view === 'write') {
+                    if (view !== 'read') {
+                      setReadOrigin(view === 'write' ? 'write' : 'outline');
                       setManuscriptJump((previous) => ({
-                        id: chapter.id,
+                        id: view === 'write' ? chapter.id : '',
                         request: previous.request + 1,
                       }));
                       setView('read');
-                    } else setView('write');
+                    } else setView(readOrigin);
                   }}
                 >
                   <BookOpen size={15} />
-                  {view === 'read' ? 'Back to chapter' : 'Read whole book'}
+                  <span>
+                    {view === 'read'
+                      ? readOrigin === 'outline'
+                        ? 'Back to outline'
+                        : 'Back to chapter'
+                      : 'Read book'}
+                  </span>
                 </button>
               )}
               <button
@@ -1073,44 +1192,6 @@ export default function App() {
               )}
             </div>
           </div>
-          {(view === 'write' || view === 'read') && (
-            <nav className="chapter-navigation" aria-label="Chapter navigation">
-              <button
-                className="text-button"
-                aria-label="Previous chapter"
-                disabled={chapterIndex === 0}
-                onClick={() => chooseChapter(book.chapters[chapterIndex - 1])}
-              >
-                <ChevronLeft size={17} />
-                <span>Previous</span>
-              </button>
-              <select
-                aria-label="Go to chapter"
-                value={chapter.id}
-                onChange={(e) => {
-                  const target = book.chapters.find(
-                    (c) => c.id === e.target.value,
-                  );
-                  if (target) chooseChapter(target);
-                }}
-              >
-                {book.chapters.map((c, index) => (
-                  <option key={c.id} value={c.id}>
-                    {index + 1}. {c.title || 'Untitled chapter'}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="text-button"
-                aria-label="Next chapter"
-                disabled={chapterIndex === book.chapters.length - 1}
-                onClick={() => chooseChapter(book.chapters[chapterIndex + 1])}
-              >
-                <span>Next</span>
-                <ChevronRight size={17} />
-              </button>
-            </nav>
-          )}
           {view === 'write' && (
             <>
               <div className="editor-scroll" ref={editorScroll}>
@@ -1169,7 +1250,15 @@ export default function App() {
             </>
           )}
           {view === 'outline' && (
-            <div className="view-scroll">
+            <div
+              className="view-scroll"
+              key={book.id}
+              ref={outlineScroll}
+              onScroll={(event) => {
+                outlinePositions.current[book.id] =
+                  event.currentTarget.scrollTop;
+              }}
+            >
               <div className="view-heading">
                 <div>
                   <h1>Outline</h1>
@@ -1831,6 +1920,8 @@ export default function App() {
               onOpen={openProject}
               onCreate={createProject}
               readOnly={readOnly}
+              activeProjectId={book.id}
+              onClose={closeProject}
             />
           )}
           {['newBook', 'newChapter'].includes(modal) && (
@@ -1847,7 +1938,6 @@ export default function App() {
                   mutate((b) => ({ ...b, chapters: [...b.chapters, c] }));
                   chooseScene(c.scenes[0].id);
                 }
-                setView('write');
                 setModal(null);
               }}
             >
@@ -2316,12 +2406,12 @@ export default function App() {
           {modal === 'help' && (
             <div className="help-copy">
               <p>
-                <strong>Chapters.</strong> Open a chapter from Outline, or
-                select it in Manuscript. Use the chapter picker to jump between
-                chapters and Read whole book for the complete draft. Add
-                chapters in the left sidebar. Reorder them by dragging or use
-                the arrows in Outline. Each chapter has a summary and a drafting
-                status.
+                <strong>Chapters.</strong> Open a chapter from Outline or the
+                left sidebar. Each chapter opens in a tab; closing its tab keeps
+                the chapter saved. Click Outline in the breadcrumb to return to
+                the chapter summaries. Use the chapter picker or arrows to
+                switch chapters, and Read book for the complete draft. Reorder
+                chapters by dragging or using the arrows in Outline.
               </p>
               <p>
                 <strong>Characters.</strong> Add a character and their aliases.
@@ -2343,8 +2433,13 @@ export default function App() {
               <p>
                 <strong>Keyboard shortcuts.</strong> Use the expand button to
                 hide the panels. Escape closes the active dialog or panel,
-                leaves focus mode, or returns from Read whole book to your
-                chapter. Ctrl / ⌘ K searches your book.
+                leaves focus mode, or returns from Read book to the previous
+                view. Ctrl / ⌘ K searches your book.
+              </p>
+              <p>
+                <strong>Projects.</strong> Use the project name at the top to
+                switch projects, create one, or close the current project. Each
+                project keeps its own open chapter tabs.
               </p>
               <button
                 className="secondary-button"

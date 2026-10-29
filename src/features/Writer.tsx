@@ -236,7 +236,6 @@ export function Writer({
             if (imageInput.current) imageInput.current.value = '';
           }}
         />
-        <span className="toolbar-type">Manuscript</span>
       </div>
       {imageError && (
         <p className="inline-error" role="alert">

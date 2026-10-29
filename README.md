@@ -5,7 +5,7 @@ Built with React, TypeScript, and Tiptap; runs locally or as a static GitHub Pag
 
 ## Workspace
 
-- Open only the projects you want in closable tabs. The + button opens your library or creates a project.
+- Switch projects from the project name at the top. Open chapters from Outline into closable tabs; each project remembers its tabs.
 - Write and reorder chapters, add summaries, and track Planned, Drafting, Revising, and Complete status.
 - See chapter and book word counts and estimated pages, without targets or reading-time goals.
 - Keep compact character profiles with first, last, optional middle names, and aliases. Click highlighted full names or unique first names to open their profiles.
