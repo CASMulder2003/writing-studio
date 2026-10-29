@@ -8,7 +8,9 @@ chapter without adopting novel-length goals.
 
 The workspace combines ordered chapters, summaries and drafting status, a rich-text
 editor, character cards, and a notebook. Character names and aliases link to their
-profiles without modifying manuscript text. Ambiguous shared aliases remain unlinked.
+profiles without modifying manuscript text. Character names have first, last, and
+optional middle-name fields. Unique first names also link automatically; ambiguous
+shared names and aliases remain unlinked.
 
 Notes can stand alone or belong to a chapter; either kind remains visible in the
 Notebook. Notes have planning status and support attached images and simple drawings.

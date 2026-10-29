@@ -8,7 +8,7 @@ Built with React, TypeScript, and Tiptap; runs locally or as a static GitHub Pag
 - Open only the projects you want in closable tabs. The + button opens your library or creates a project.
 - Write and reorder chapters, add summaries, and track Planned, Drafting, Revising, and Complete status.
 - See chapter and book word counts and estimated pages, without targets or reading-time goals.
-- Keep character profiles and aliases. Click highlighted names in your manuscript to open their profiles.
+- Keep compact character profiles with first, last, optional middle names, and aliases. Click highlighted full names or unique first names to open their profiles.
 - Write standalone notes or attach them to chapters. Add images, captions, and drawings to the notebook.
 - Use rich text, manuscript images, focus mode, search, and a compiled reading view.
 - Save chapter versions, restore earlier drafts, and recover removed chapters.

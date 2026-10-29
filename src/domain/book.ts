@@ -67,7 +67,10 @@ const chapterSchema = z.object({
 });
 const characterSchema = z.object({
   id: z.string(),
-  name: z.string().max(200),
+  name: z.string().max(300),
+  firstName: z.string().max(200).optional(),
+  middleNames: z.string().max(200).optional(),
+  lastName: z.string().max(200).optional(),
   aliases: z.array(z.string().max(200)),
   role: z.string(),
   description: z.string(),
@@ -220,6 +223,37 @@ export function reorder<T extends { id: string }>(
   copy.splice(targetIndex, 0, item);
   return copy;
 }
+export function characterNameParts(character: Character) {
+  if (
+    character.firstName !== undefined ||
+    character.lastName !== undefined ||
+    character.middleNames !== undefined
+  )
+    return {
+      firstName: character.firstName || '',
+      middleNames: character.middleNames || '',
+      lastName: character.lastName || '',
+    };
+  // Older projects used one full-name field. Keep that name and infer editable parts.
+  const parts = character.name.trim().split(/\s+/u);
+  const firstName = parts.shift() || '';
+  const lastName = parts.length ? parts.pop()! : '';
+  return { firstName, middleNames: parts.join(' '), lastName };
+}
+export function updateCharacterName(
+  character: Character,
+  patch: Partial<ReturnType<typeof characterNameParts>>,
+): Character {
+  const parts = { ...characterNameParts(character), ...patch };
+  return {
+    ...character,
+    ...parts,
+    name: [parts.firstName, parts.middleNames, parts.lastName]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(' '),
+  };
+}
 export function mentions(text: string, characters: Character[]) {
   const candidates: {
     from: number;
@@ -229,7 +263,11 @@ export function mentions(text: string, characters: Character[]) {
   }[] = [];
   const aliases = new Map<string, Character[]>();
   for (const character of characters)
-    for (const raw of [character.name, ...character.aliases]) {
+    for (const raw of [
+      character.name,
+      characterNameParts(character).firstName,
+      ...character.aliases,
+    ]) {
       const name = raw.trim();
       if (!name) continue;
       const list = aliases.get(name.toLocaleLowerCase()) || [];

@@ -38,8 +38,8 @@ import {
   chapterWords,
   estimatedBookPages,
   estimatedChapterPages,
-  hasContent,
-  docHtml,
+  characterNameParts,
+  updateCharacterName,
   download,
   fileName,
   id,
@@ -66,6 +66,7 @@ import {
 import { Writer } from '../features/Writer';
 import { DrawingPad } from '../features/DrawingPad';
 import { ProjectChooser } from '../features/ProjectChooser';
+import { Manuscript } from '../features/Manuscript';
 import { readImage } from '../shared/images';
 
 type View = 'write' | 'outline' | 'characters' | 'notes' | 'read';
@@ -99,10 +100,20 @@ function Modal({
   close: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const returnFocus = useRef(
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
   useEffect(() => {
     const element = ref.current;
     element?.showModal();
-    return () => element?.close();
+    element?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    return () => {
+      element?.close();
+      if (returnFocus.current?.isConnected)
+        returnFocus.current.focus({ preventScroll: true });
+    };
   }, []);
   return (
     <dialog
@@ -187,6 +198,8 @@ export default function App() {
   const scene =
     chapter?.scenes.find((s) => s.id === activeScene) || chapter?.scenes[0];
   const [view, setView] = useState<View>('write');
+  const [manuscriptJump, setManuscriptJump] = useState({ id: '', request: 0 });
+  const editorScroll = useRef<HTMLDivElement>(null);
   const [inspector, setInspector] = useState(() => window.innerWidth > 1100);
   const [inspectorTab, setInspectorTab] = useState<
     'scene' | 'character' | 'history'
@@ -195,6 +208,8 @@ export default function App() {
   const [noteId, setNoteId] = useState('');
   const [focus, setFocus] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const navigationToggle = useRef<HTMLButtonElement>(null);
+  const contextToggle = useRef<HTMLButtonElement>(null);
   const [modal, setModal] = useState<ModalName>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formAuthor, setFormAuthor] = useState('');
@@ -212,6 +227,10 @@ export default function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const bookRef = useRef<Book | undefined>(book);
   bookRef.current = book;
+  useEffect(() => {
+    if (view === 'write' && editorScroll.current)
+      editorScroll.current.scrollTop = 0;
+  }, [scene?.id, view]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(''), 4500);
@@ -242,11 +261,33 @@ export default function App() {
         e.preventDefault();
         setModal('search');
       }
-      if (e.key === 'Escape' && focus) setFocus(false);
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+      // Native dialogs handle their own cancellation, leaving lower layers open.
+      if (modal) return;
+      if (focus) {
+        e.preventDefault();
+        e.stopPropagation();
+        setFocus(false);
+      } else if (mobileNav) {
+        e.preventDefault();
+        e.stopPropagation();
+        setMobileNav(false);
+        navigationToggle.current?.focus({ preventScroll: true });
+      } else if (view === 'write' && inspector) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (
+          document.activeElement instanceof Element &&
+          document.activeElement.closest('.inspector')
+        )
+          contextToggle.current?.focus({ preventScroll: true });
+        setInspector(false);
+      }
     };
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [focus]);
+    // Handle workspace dismissal before the rich-text editor's Escape binding.
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, [focus, modal, mobileNav, view, inspector]);
   const mutate = (fn: (b: Book) => Book) => {
     if (bookRef.current && !library.readOnly) {
       const updated = fn(bookRef.current);
@@ -278,6 +319,16 @@ export default function App() {
     setActiveScene(sid);
     setView('write');
     setMobileNav(false);
+  };
+  const chooseChapter = (target: Chapter) => {
+    if (view === 'read') {
+      setActiveScene(target.scenes[0].id);
+      setManuscriptJump((previous) => ({
+        id: target.id,
+        request: previous.request + 1,
+      }));
+      setMobileNav(false);
+    } else chooseScene(target.scenes[0].id);
   };
   const open = (name: ModalName) => {
     setFormTitle('');
@@ -326,7 +377,10 @@ export default function App() {
   const makeCharacter = () => {
     const c: Character = {
       id: id(),
-      name: 'New character',
+      name: '',
+      firstName: '',
+      middleNames: '',
+      lastName: '',
       aliases: [],
       role: '',
       description: '',
@@ -514,15 +568,16 @@ export default function App() {
   const allScenes = book.chapters.flatMap((c) =>
     c.scenes.map((s) => ({ chapter: c, scene: s })),
   );
-  const flatIndex = allScenes.findIndex((x) => x.scene.id === scene.id);
+  const matchesFor = (content: DocNode, characterId: string) =>
+    mentions(plainText(content), book.characters).filter(
+      (match) => match.characterId === characterId,
+    );
   const characterScenes = character
-    ? allScenes.filter(
-        (x) => mentions(plainText(x.scene.content), [character]).length,
-      )
+    ? allScenes.filter((x) => matchesFor(x.scene.content, character.id).length)
     : [];
   const navItems: { id: View; label: string; icon: typeof BookOpen }[] = [
-    { id: 'write', label: 'Manuscript', icon: BookOpen },
     { id: 'outline', label: 'Outline', icon: LayoutGrid },
+    { id: 'write', label: 'Manuscript', icon: BookOpen },
     { id: 'characters', label: 'Characters', icon: Users },
     { id: 'notes', label: 'Notebook', icon: NotebookPen },
   ];
@@ -535,18 +590,62 @@ export default function App() {
         ),
       }));
   };
+  const nameParts = character ? characterNameParts(character) : null;
+  const patchName = (patch: Parameters<typeof updateCharacterName>[1]) => {
+    if (character)
+      mutate((b) => ({
+        ...b,
+        characters: b.characters.map((c) =>
+          c.id === character.id ? updateCharacterName(c, patch) : c,
+        ),
+      }));
+  };
   const characterFields = character ? (
     <div className="character-fields" key={character.id}>
-      <div className="avatar">{character.name.slice(0, 1).toUpperCase()}</div>
-      <label>
-        Name
-        <input
-          aria-label="Character name"
-          value={character.name}
-          disabled={readOnly}
-          onChange={(e) => patchCharacter({ name: e.target.value })}
-        />
-      </label>
+      <div className="character-identity">
+        <span className="avatar mini">
+          {character.name.slice(0, 1).toUpperCase() || '?'}
+        </span>
+        <strong>{character.name || 'New character'}</strong>
+      </div>
+      <div className="character-name-fields">
+        <label>
+          First name
+          <input
+            aria-label="First name"
+            autoFocus={!character.name}
+            maxLength={80}
+            value={nameParts!.firstName}
+            disabled={readOnly}
+            onChange={(e) => patchName({ firstName: e.target.value })}
+          />
+        </label>
+        <label>
+          Last name
+          <input
+            aria-label="Last name"
+            maxLength={80}
+            value={nameParts!.lastName}
+            disabled={readOnly}
+            onChange={(e) => patchName({ lastName: e.target.value })}
+          />
+        </label>
+        <label className="middle-names">
+          <span>
+            Middle names <span className="optional-label">(optional)</span>
+          </span>
+          <input
+            aria-label="Middle names (optional)"
+            maxLength={80}
+            value={nameParts!.middleNames}
+            disabled={readOnly}
+            onChange={(e) => patchName({ middleNames: e.target.value })}
+          />
+        </label>
+      </div>
+      <p className="hint character-name-hint">
+        First names link automatically when unique. Add nicknames below.
+      </p>
       <label>
         Role
         <input
@@ -610,8 +709,7 @@ export default function App() {
             <span>
               {x.chapter.title}
               <small>
-                {mentions(plainText(x.scene.content), [character]).length}{' '}
-                mentions
+                {matchesFor(x.scene.content, character.id).length} mentions
               </small>
             </span>
             <ArrowRight size={14} />
@@ -739,7 +837,11 @@ export default function App() {
             {navItems.map((n) => (
               <button
                 key={n.id}
-                className={view === n.id ? 'selected' : ''}
+                className={
+                  view === n.id || (n.id === 'write' && view === 'read')
+                    ? 'selected'
+                    : ''
+                }
                 onClick={() => {
                   setView(n.id);
                   setMobileNav(false);
@@ -811,7 +913,7 @@ export default function App() {
                 : book.chapters.map((c, i) => (
                     <div
                       key={c.id}
-                      className={`chapter-item ${chapter.id === c.id && view === 'write' ? 'active' : ''} ${dragging === c.id ? 'dragging' : ''}`}
+                      className={`chapter-item ${chapter.id === c.id && (view === 'write' || view === 'read') ? 'active' : ''} ${dragging === c.id ? 'dragging' : ''}`}
                       draggable={!readOnly}
                       onDragStart={(e) => {
                         setDragging(c.id);
@@ -831,7 +933,7 @@ export default function App() {
                         </span>
                         <button
                           className="chapter-select"
-                          onClick={() => chooseScene(c.scenes[0].id)}
+                          onClick={() => chooseChapter(c)}
                         >
                           <span className="chapter-number">
                             {String(i + 1).padStart(2, '0')}
@@ -898,8 +1000,10 @@ export default function App() {
           <div className="workspace-bar">
             <div className="workspace-crumb">
               <button
+                ref={navigationToggle}
                 className="icon-button nav-toggle"
                 aria-label="Toggle navigation"
+                aria-expanded={mobileNav}
                 onClick={() => setMobileNav(!mobileNav)}
               >
                 <BookOpen size={18} />
@@ -918,7 +1022,7 @@ export default function App() {
                 {view === 'write'
                   ? chapter.title
                   : view === 'read'
-                    ? 'Reading view'
+                    ? 'Complete book'
                     : book.title}
               </strong>
             </div>
@@ -926,10 +1030,18 @@ export default function App() {
               {(view === 'write' || view === 'read') && (
                 <button
                   className="text-button reading-toggle"
-                  onClick={() => setView(view === 'read' ? 'write' : 'read')}
+                  onClick={() => {
+                    if (view === 'write') {
+                      setManuscriptJump((previous) => ({
+                        id: chapter.id,
+                        request: previous.request + 1,
+                      }));
+                      setView('read');
+                    } else setView('write');
+                  }}
                 >
                   <BookOpen size={15} />
-                  {view === 'read' ? 'Back to writing' : 'Read book'}
+                  {view === 'read' ? 'Back to chapter' : 'Read whole book'}
                 </button>
               )}
               <button
@@ -942,6 +1054,7 @@ export default function App() {
               </button>
               {view === 'write' && (
                 <button
+                  ref={contextToggle}
                   className="icon-button"
                   title="Toggle context panel"
                   aria-label="Toggle context panel"
@@ -953,9 +1066,47 @@ export default function App() {
               )}
             </div>
           </div>
+          {(view === 'write' || view === 'read') && (
+            <nav className="chapter-navigation" aria-label="Chapter navigation">
+              <button
+                className="text-button"
+                aria-label="Previous chapter"
+                disabled={chapterIndex === 0}
+                onClick={() => chooseChapter(book.chapters[chapterIndex - 1])}
+              >
+                <ChevronLeft size={17} />
+                <span>Previous</span>
+              </button>
+              <select
+                aria-label="Go to chapter"
+                value={chapter.id}
+                onChange={(e) => {
+                  const target = book.chapters.find(
+                    (c) => c.id === e.target.value,
+                  );
+                  if (target) chooseChapter(target);
+                }}
+              >
+                {book.chapters.map((c, index) => (
+                  <option key={c.id} value={c.id}>
+                    {index + 1}. {c.title || 'Untitled chapter'}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="text-button"
+                aria-label="Next chapter"
+                disabled={chapterIndex === book.chapters.length - 1}
+                onClick={() => chooseChapter(book.chapters[chapterIndex + 1])}
+              >
+                <span>Next</span>
+                <ChevronRight size={17} />
+              </button>
+            </nav>
+          )}
           {view === 'write' && (
             <>
-              <div className="editor-scroll">
+              <div className="editor-scroll" ref={editorScroll}>
                 <div className="chapter-heading">
                   <div className="chapter-kicker">
                     CHAPTER {String(chapterIndex + 1).padStart(2, '0')}
@@ -1004,31 +1155,9 @@ export default function App() {
                   <span className="footer-separator">·</span> ~
                   {estimatedChapterPages(chapter)} pages
                 </span>
-                <div>
-                  <button
-                    className="icon-button"
-                    aria-label="Previous chapter"
-                    disabled={flatIndex === 0}
-                    onClick={() =>
-                      chooseScene(allScenes[flatIndex - 1].scene.id)
-                    }
-                  >
-                    <ChevronLeft size={17} />
-                  </button>
-                  <span>
-                    {flatIndex + 1} / {allScenes.length}
-                  </span>
-                  <button
-                    className="icon-button"
-                    aria-label="Next chapter"
-                    disabled={flatIndex === allScenes.length - 1}
-                    onClick={() =>
-                      chooseScene(allScenes[flatIndex + 1].scene.id)
-                    }
-                  >
-                    <ChevronRight size={17} />
-                  </button>
-                </div>
+                <span>
+                  Chapter {chapterIndex + 1} of {book.chapters.length}
+                </span>
               </footer>
             </>
           )}
@@ -1185,10 +1314,14 @@ export default function App() {
                         className={`character-card ${character.id === c.id ? 'selected' : ''}`}
                         onClick={() => setCharacterId(c.id)}
                       >
-                        <span className="avatar">{c.name.slice(0, 1)}</span>
-                        <strong>{c.name || 'Unnamed character'}</strong>
-                        <span>{c.role || 'Add a role'}</span>
-                        <p>{c.description || 'No description yet.'}</p>
+                        <span className="avatar mini">
+                          {c.name.slice(0, 1) || '?'}
+                        </span>
+                        <span className="character-card-copy">
+                          <strong>{c.name || 'New character'}</strong>
+                          <small>{c.role || 'Add a role'}</small>
+                          {c.description && <p>{c.description}</p>}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -1372,41 +1505,14 @@ export default function App() {
             </div>
           )}
           {view === 'read' && (
-            <div className="view-scroll reading-scroll">
-              <article className="reading-paper">
-                <header>
-                  <span className="eyebrow">MANUSCRIPT</span>
-                  <h1>{book.title}</h1>
-                  <p>{book.author}</p>
-                </header>
-                {book.chapters.map((c, i) => (
-                  <section key={c.id} className="reading-chapter">
-                    <div className="chapter-kicker">CHAPTER {i + 1}</div>
-                    <h2>{c.title}</h2>
-                    {c.scenes.map((s) => (
-                      <div key={s.id} className="reading-scene">
-                        {hasContent(s.content) ? (
-                          <div
-                            dangerouslySetInnerHTML={{
-                              __html: docHtml(s.content),
-                            }}
-                          />
-                        ) : (
-                          <p className="hint">This chapter is empty.</p>
-                        )}
-                        <button
-                          className="text-button"
-                          onClick={() => chooseScene(s.id)}
-                        >
-                          Edit chapter
-                          <ArrowRight size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </section>
-                ))}
-              </article>
-            </div>
+            <Manuscript
+              key={book.id}
+              book={book}
+              jump={manuscriptJump}
+              onEdit={chooseScene}
+              onAdd={() => open('newChapter')}
+              readOnly={readOnly}
+            />
           )}
         </main>
         {view === 'write' && inspector && (
@@ -1550,9 +1656,7 @@ export default function App() {
                   )}
                   <div className="section-caption">IN THIS CHAPTER</div>
                   {book.characters
-                    .filter(
-                      (c) => mentions(plainText(scene.content), [c]).length,
-                    )
+                    .filter((c) => matchesFor(scene.content, c.id).length)
                     .map((c) => (
                       <button
                         key={c.id}
@@ -1565,7 +1669,7 @@ export default function App() {
                       </button>
                     ))}
                   {!book.characters.some(
-                    (c) => mentions(plainText(scene.content), [c]).length,
+                    (c) => matchesFor(scene.content, c.id).length,
                   ) && (
                     <p className="hint">
                       Character mentions appear here as you write.
@@ -1750,10 +1854,22 @@ export default function App() {
                 {modal === 'newBook' ? 'Working title' : 'Title'}
                 <input
                   autoFocus
+                  data-autofocus="true"
                   required
                   maxLength={300}
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      modal === 'newChapter' &&
+                      e.key === 'Tab' &&
+                      !e.shiftKey &&
+                      !formTitle.trim()
+                    ) {
+                      e.preventDefault();
+                      setFormTitle('Chapter ' + (book.chapters.length + 1));
+                    }
+                  }}
                   placeholder={
                     modal === 'newBook'
                       ? 'Book title'
@@ -1761,6 +1877,12 @@ export default function App() {
                   }
                 />
               </label>
+              {modal === 'newChapter' && (
+                <p className="hint chapter-title-suggestion">
+                  Press <kbd>Tab</kbd> to use “Chapter{' '}
+                  {book.chapters.length + 1}”, or enter your own title.
+                </p>
+              )}
               {modal === 'newBook' && (
                 <label>
                   Author
@@ -2070,6 +2192,7 @@ export default function App() {
                 <Search size={18} />
                 <input
                   autoFocus
+                  data-autofocus="true"
                   aria-label="Search manuscript and notes"
                   placeholder="Search chapters, writing, characters, notes…"
                   value={search}
@@ -2192,15 +2315,18 @@ export default function App() {
           {modal === 'help' && (
             <div className="help-copy">
               <p>
-                <strong>Write in chapters.</strong> Add chapters in the left
-                sidebar. Reorder them by dragging or use the arrows in Outline.
-                Each chapter has a summary and a drafting status.
+                <strong>Write in chapters.</strong> Open a chapter from Outline,
+                or select it in Manuscript. Use the chapter picker to jump
+                between chapters and Read whole book for the complete draft. Add
+                chapters in the left sidebar. Reorder them by dragging or use
+                the arrows in Outline. Each chapter has a summary and a drafting
+                status.
               </p>
               <p>
                 <strong>Keep characters close.</strong> Add a character and
-                their aliases. Their names are highlighted in the editor; click
-                one to open the card. Shared aliases are left unlinked to avoid
-                guessing.
+                their aliases. Full names and unique first names are highlighted
+                in the editor; click one to open the card. Shared aliases are
+                left unlinked to avoid guessing.
               </p>
               <p>
                 <strong>Revise with a way back.</strong> Save a chapter version
@@ -2216,8 +2342,8 @@ export default function App() {
               </p>
               <p>
                 <strong>Find your focus.</strong> Use the expand button to hide
-                the panels. Escape returns to the workspace. Ctrl / ⌘ K searches
-                your book.
+                the panels. Escape closes the active dialog or panel, or leaves
+                focus mode. Ctrl / ⌘ K searches your book.
               </p>
               <button
                 className="secondary-button"

@@ -5,7 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { characterDecorations } from './characterReferences';
 import {
   Bold,
   Italic,
@@ -20,12 +20,7 @@ import {
   ImagePlus,
 } from 'lucide-react';
 import { readImage } from '../shared/images';
-import {
-  mentions,
-  type Character,
-  type DocNode,
-  type Scene,
-} from '../domain/book';
+import { type Character, type DocNode, type Scene } from '../domain/book';
 
 export function Writer({
   scene,
@@ -59,22 +54,10 @@ export function Writer({
               key: new PluginKey('characterReferences'),
               props: {
                 decorations(state) {
-                  const marks: Decoration[] = [];
-                  state.doc.descendants((node, pos) => {
-                    if (node.isText && node.text)
-                      for (const m of mentions(
-                        node.text,
-                        current.current.characters,
-                      ))
-                        marks.push(
-                          Decoration.inline(pos + m.from, pos + m.to, {
-                            class: 'character-mention',
-                            'data-character-id': m.characterId,
-                            title: 'Open ' + m.name + '’s character card',
-                          }),
-                        );
-                  });
-                  return DecorationSet.create(state.doc, marks);
+                  return characterDecorations(
+                    state.doc,
+                    current.current.characters,
+                  );
                 },
                 handleClick(_view, _pos, event) {
                   const element = (event.target as HTMLElement).closest(
@@ -111,7 +94,7 @@ export function Writer({
       editor.view.dispatch(editor.state.tr.setMeta('charactersChanged', true));
   }, [characters, editor]);
   useEffect(() => {
-    editor?.setEditable(!readOnly);
+    editor?.setEditable(!readOnly, false);
   }, [readOnly, editor]);
   const active = useEditorState({
     editor,

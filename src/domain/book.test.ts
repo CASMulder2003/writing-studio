@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   backup,
+  characterNameParts,
+  updateCharacterName,
   docHtml,
   estimatedChapterPages,
   importCopy,
@@ -166,6 +168,57 @@ describe('book structure and portable backups', () => {
   });
 });
 describe('character references', () => {
+  it('recognises a unique first name automatically, without matching parts of other words', () => {
+    const matches = mentions('Anna Stone met Anna. Annabelle watched.', [
+      character('Anna Stone'),
+    ]);
+    expect(matches.map((match) => match.name)).toEqual(['Anna Stone', 'Anna']);
+    expect(matches.every((match) => match.characterId === 'Anna Stone')).toBe(
+      true,
+    );
+  });
+  it('keeps full names distinct when first names are shared', () => {
+    const matches = mentions('Anna Stone spoke to Anna Reed. Anna listened.', [
+      character('Anna Stone'),
+      character('Anna Reed'),
+    ]);
+    expect(matches.map((match) => match.name)).toEqual([
+      'Anna Stone',
+      'Anna Reed',
+    ]);
+  });
+  it('preserves existing full names and supports editable middle names', () => {
+    const original = character('Anna Maria Stone', ['Annie']);
+    expect(characterNameParts(original)).toEqual({
+      firstName: 'Anna',
+      middleNames: 'Maria',
+      lastName: 'Stone',
+    });
+    const updated = updateCharacterName(original, {
+      middleNames: 'Maria Louise',
+      lastName: 'van Stone',
+    });
+    expect(updated.name).toBe('Anna Maria Louise van Stone');
+    const book = newBook();
+    book.characters = [updated];
+    expect(parseBackup(backup(book)).characters[0]).toEqual(updated);
+    expect(
+      mentions('Anna and Annie waited.', [updated]).map((match) => match.name),
+    ).toEqual(['Anna', 'Annie']);
+  });
+  it('handles single names and accented or hyphenated first names', () => {
+    expect(characterNameParts(character('Mara'))).toEqual({
+      firstName: 'Mara',
+      middleNames: '',
+      lastName: '',
+    });
+    expect(
+      mentions('Émile met Anne-Marie.', [
+        character('Émile Durand'),
+        character('Anne-Marie Stone'),
+      ]).map((match) => match.name),
+    ).toEqual(['Émile', 'Anne-Marie']);
+  });
   it('matches whole names and aliases while avoiding substrings', () => {
     const matches = mentions('Elias met Eli; Cornelius went home.', [
       character('Elias', ['Eli']),

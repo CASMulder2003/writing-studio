@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Plus, ArrowRight, ChevronLeft } from 'lucide-react';
 import { bookWords, estimatedBookPages, type Book } from '../domain/book';
 export function ProjectChooser({
@@ -15,9 +15,22 @@ export function ProjectChooser({
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
+  const newProjectButton = useRef<HTMLButtonElement>(null);
+  const wasCreating = useRef(false);
+  useEffect(() => {
+    if (wasCreating.current && !creating) newProjectButton.current?.focus();
+    wasCreating.current = creating;
+  }, [creating]);
   if (creating)
     return (
       <form
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            e.stopPropagation();
+            setCreating(false);
+          }
+        }}
         onSubmit={(e) => {
           e.preventDefault();
           if (title.trim()) onCreate(title.trim(), author.trim());
@@ -66,6 +79,7 @@ export function ProjectChooser({
       <div className="project-chooser-heading">
         <span className="eyebrow">EXISTING PROJECTS</span>
         <button
+          ref={newProjectButton}
           className="secondary-button"
           disabled={readOnly}
           onClick={() => setCreating(true)}
