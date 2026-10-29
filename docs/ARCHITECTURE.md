@@ -45,7 +45,10 @@ implemented.
 jsPDF generates a separate, lazily loaded book PDF. Crimson Text fonts are bundled
 locally with their license. The writer selects chapters and a 5.5 × 8.5 or 6 × 9 inch
 trim size. Chapter numbers retain their manuscript positions; body pagination starts
-after the title page. Rich text, hard line breaks, and embedded images are included.
+after the title page and its blank reverse. Body text uses 10.5 pt Crimson Text with
+14 pt leading, justified wrapped lines, 5 mm paragraph indents, and mirrored margins.
+Paragraph endings and explicit line breaks are not stretched. Pagination keeps at
+least two paragraph lines together across page breaks. Rich text and embedded images are included.
 Planning notes and character profiles are excluded from manuscript exports.
 
 The complete JSON backup includes all planning records, images, versions, and removed

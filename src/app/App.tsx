@@ -205,7 +205,7 @@ export default function App() {
   const [contextNoteId, setContextNoteId] = useState('');
   const [attachmentNoteId, setAttachmentNoteId] = useState('');
   const [selectedChapters, setSelectedChapters] = useState(new Set<string>());
-  const [pdfSize, setPdfSize] = useState<'compact' | 'large'>('compact');
+  const [pdfSize, setPdfSize] = useState<'compact' | 'large'>('large');
   const [pdfBusy, setPdfBusy] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [editorVersion, setEditorVersion] = useState(0);
@@ -1896,13 +1896,16 @@ export default function App() {
                     <option value="compact">
                       Compact novel · 5.5 × 8.5 inches
                     </option>
-                    <option value="large">Larger novel · 6 × 9 inches</option>
+                    <option value="large">
+                      Trade paperback · 6 × 9 inches
+                    </option>
                   </select>
                 </label>
                 <p className="hint">
-                  Includes a title page, chapter openings, and page numbers.
-                  Chapters retain their original numbers. Planning notes are
-                  excluded.
+                  Crimson Text · 10.5 pt · 14 pt line spacing · justified
+                  paragraphs. Includes a title page, blank title-page reverse,
+                  chapter openings, and page numbers. Chapters retain their
+                  original numbers. Planning notes are excluded.
                 </p>
               </section>
               <div className="export-options">

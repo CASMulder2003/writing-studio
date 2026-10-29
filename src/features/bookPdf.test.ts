@@ -49,7 +49,7 @@ describe('book PDF layout', () => {
         size,
         fonts,
       );
-      expect(pdf.getNumberOfPages()).toBe(2);
+      expect(pdf.getNumberOfPages()).toBe(3);
       expect(pdf.internal.pageSize.getWidth()).toBeCloseTo(
         size === 'compact' ? 139.7 : 152.4,
         1,

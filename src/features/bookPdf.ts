@@ -1,14 +1,16 @@
 import { jsPDF } from 'jspdf';
 import { type Book, type DocNode, fileName } from '../domain/book';
+import {
+  layoutParagraph,
+  justificationGap,
+  type FontStyle,
+  type TextRun as Run,
+  type TextLine,
+} from './pdfLayout';
 
-type FontStyle = 'normal' | 'italic' | 'bold' | 'bolditalic';
 export type PdfFonts = Record<FontStyle, string>;
-type Run = {
-  text: string;
-  style: FontStyle;
-  underline: boolean;
-  strike: boolean;
-};
+const bodySize = 10.5;
+const bodyLeading = (14 * 25.4) / 72;
 type Block = {
   kind: 'text' | 'heading' | 'image' | 'rule';
   runs?: Run[];
@@ -107,7 +109,7 @@ function blocks(node: DocNode): Block[] {
 export async function createBookPdf(
   book: Book,
   selectedIds: Set<string>,
-  size: 'compact' | 'large' = 'compact',
+  size: 'compact' | 'large' = 'large',
   providedFonts?: PdfFonts,
 ) {
   const selected = book.chapters.filter((c) => selectedIds.has(c.id));
@@ -132,8 +134,8 @@ export async function createBookPdf(
     creator: 'Writing Studio',
   });
   doc.setFont('BookSerif', 'normal');
-  doc.setTextColor(35, 39, 35);
-  doc.setFontSize(29);
+  doc.setTextColor(20);
+  doc.setFontSize(25);
   const titleLines = doc.splitTextToSize(
     book.title || 'Untitled book',
     width - 36,
@@ -141,10 +143,10 @@ export async function createBookPdf(
   let titleY = 62;
   for (const line of titleLines) {
     doc.text(line, width / 2, titleY, { align: 'center' });
-    titleY += 12;
+    titleY += 10;
   }
   if (book.author) {
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     for (const line of doc.splitTextToSize(
       book.author,
       width - 36,
@@ -153,37 +155,37 @@ export async function createBookPdf(
       titleY += 7;
     }
   }
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(125);
   doc.text('DRAFT', width / 2, height - 26, { align: 'center' });
+  // A blank verso places body page 1 on the right in a printed spread.
+  doc.addPage([width, height]);
   let y = 0;
-  let fontSize = 11.5;
-  const lineHeight = 5.7;
-  let line: Run[] = [];
-  let lineWidth = 0;
-  let indent = 0;
-  const left = () => (doc.getNumberOfPages() % 2 === 0 ? 19 : 17);
+  let fontSize = bodySize;
+  const left = () => (doc.getNumberOfPages() % 2 === 1 ? 20 : 16);
   const textWidth = width - 36;
   const startPage = () => {
     doc.addPage([width, height]);
-    y = 25;
+    y = 24;
   };
   const measure = (run: Run) => {
     doc.setFont('BookSerif', run.style);
     doc.setFontSize(fontSize);
     return doc.getTextWidth(run.text);
   };
-  const flushLine = () => {
+  const renderLine = (line: TextLine, leading: number) => {
     if (y > height - 22) {
       startPage();
     }
-    let x = left() + indent;
-    doc.setTextColor(35, 39, 35);
-    for (const run of line) {
+    let x = left() + line.indent;
+    const extraSpace = justificationGap(line, textWidth);
+    doc.setTextColor(0);
+    for (const run of line.runs) {
       doc.setFont('BookSerif', run.style);
       doc.setFontSize(fontSize);
       doc.text(run.text, x, y);
-      const span = doc.getTextWidth(run.text);
+      const span =
+        doc.getTextWidth(run.text) + (/^\s+$/u.test(run.text) ? extraSpace : 0);
       if (run.underline) {
         doc.setLineWidth(0.16);
         doc.line(x, y + 0.8, x + span, y + 0.8);
@@ -194,36 +196,7 @@ export async function createBookPdf(
       }
       x += span;
     }
-    line = [];
-    lineWidth = 0;
-    indent = 0;
-    y += fontSize > 12 ? 7.2 : lineHeight;
-  };
-  const addRun = (run: Run) => {
-    for (const token of run.text.match(/\n|[^\S\n]+|[^\s]+/gu) || []) {
-      if (token === '\n') {
-        flushLine();
-        continue;
-      }
-      let piece = { ...run, text: token };
-      let span = measure(piece);
-      if (lineWidth + span > textWidth - indent && line.length) {
-        flushLine();
-        if (/^\s+$/.test(token)) continue;
-      }
-      if (span > textWidth - indent) {
-        for (const character of token) {
-          piece = { ...run, text: character };
-          span = measure(piece);
-          if (lineWidth + span > textWidth - indent && line.length) flushLine();
-          line.push(piece);
-          lineWidth += span;
-        }
-      } else {
-        line.push(piece);
-        lineWidth += span;
-      }
-    }
+    y += leading;
   };
   const openingPages = new Set<number>();
   for (const chapter of selected) {
@@ -231,25 +204,25 @@ export async function createBookPdf(
     openingPages.add(doc.getNumberOfPages());
     doc.setFont('BookSerif', 'normal');
     doc.setTextColor(105);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.text(
       `CHAPTER ${book.chapters.findIndex((c) => c.id === chapter.id) + 1}`,
       width / 2,
       35,
       { align: 'center' },
     );
-    doc.setTextColor(35, 39, 35);
-    doc.setFontSize(23);
+    doc.setTextColor(20);
+    doc.setFontSize(18);
     const titles = doc.splitTextToSize(
       chapter.title || 'Untitled chapter',
       textWidth,
     ) as string[];
-    y = 47;
+    y = 46;
     for (const title of titles) {
       doc.text(title, width / 2, y, { align: 'center' });
-      y += 9;
+      y += 7.5;
     }
-    y += 10;
+    y += 9;
     const content = chapter.scenes.flatMap((s) => blocks(s.content));
     let firstParagraph = true;
     for (const block of content) {
@@ -284,25 +257,47 @@ export async function createBookPdf(
         firstParagraph = true;
         continue;
       }
-      fontSize = block.kind === 'heading' ? 16 : 11.5;
+      fontSize = block.kind === 'heading' ? 13 : bodySize;
+      const leading = block.kind === 'heading' ? (17 * 25.4) / 72 : bodyLeading;
       if (block.kind === 'heading') {
         if (y > height - 45) startPage();
         y += 4;
-        indent = 0;
-      } else indent = firstParagraph || block.list ? 0 : 4;
-      for (const run of block.runs || []) addRun(run);
-      flushLine();
+      }
+      const lines = layoutParagraph(
+        block.runs || [],
+        measure,
+        textWidth,
+        block.kind === 'heading' || firstParagraph || block.list ? 0 : 5,
+      );
+      for (let index = 0; index < lines.length; index++) {
+        // Keep at least two paragraph lines together at either side of a page break.
+        const remaining = Math.floor((height - 22 - y) / leading) + 1;
+        if (
+          remaining < 1 ||
+          (index === 0 && remaining === 2 && lines.length === 3) ||
+          (remaining === 1 &&
+            lines.length - index >= 2 &&
+            (index === 0 || lines.length - index === 2))
+        )
+          startPage();
+        renderLine(
+          block.kind === 'heading'
+            ? { ...lines[index], justify: false }
+            : lines[index],
+          leading,
+        );
+      }
       if (block.kind === 'heading') y += 4;
       firstParagraph = block.kind === 'heading';
     }
   }
   const totalPages = doc.getNumberOfPages();
-  for (let page = 2; page <= totalPages; page++) {
+  for (let page = 3; page <= totalPages; page++) {
     doc.setPage(page);
     doc.setFont('BookSerif', 'normal');
     doc.setTextColor(105);
-    doc.setFontSize(9);
-    doc.text(String(page - 1), width / 2, height - 12, { align: 'center' });
+    doc.setFontSize(8.5);
+    doc.text(String(page - 2), width / 2, height - 12, { align: 'center' });
     if (!openingPages.has(page)) {
       doc.setFontSize(8);
       const runningTitle = doc.splitTextToSize(book.title, textWidth)[0];
