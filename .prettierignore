@@ -1,0 +1,11 @@
+node_modules
+dist
+.pnpm-store
+.sites-runtime
+.openai
+pnpm-lock.yaml
+coverage
+private-data
+backups
+exports
+qa

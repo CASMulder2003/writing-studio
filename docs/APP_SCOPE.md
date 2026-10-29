@@ -1,0 +1,33 @@
+# Product scope
+
+Writing Studio is a personal workspace for full books and smaller writing projects.
+The main unit of the manuscript is a chapter. A short story or poem can use a single
+chapter without adopting novel-length goals.
+
+## Implemented
+
+The workspace combines ordered chapters, summaries and drafting status, a rich-text
+editor, character cards, and a notebook. Character names and aliases link to their
+profiles without modifying manuscript text. Ambiguous shared aliases remain unlinked.
+
+Notes can stand alone or belong to a chapter; either kind remains visible in the
+Notebook. Notes have planning status and support attached images and simple drawings.
+The manuscript also supports images.
+
+Project tabs represent open projects, not the entire library. Closing a tab preserves
+its data. The + button lets the writer choose an existing project or create one.
+
+Automatic local saving, manual chapter versions, recovery of removed chapters,
+complete JSON backups, and validated imports protect the writing workflow. Selected
+chapters can be exported as a novel-style PDF, HTML, or plain text. Word counts and
+estimated pages describe the existing manuscript; there is no target or word limit.
+
+## Boundaries
+
+The app is a static website with browser-local data. It does not include accounts,
+cloud synchronization, collaborative editing, offline loading, automatic AI writing,
+relationship diagrams, or a separate timeline tool. The notebook can hold research
+and planning that does not need a dedicated interface.
+
+The public repository contains application code and blank initial projects only.
+Personal manuscripts and research are not bundled with the application.

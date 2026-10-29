@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.pnpm-store/
+.sites-runtime/
+.openai/
+coverage/
+*.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+private-data/
+backups/
+exports/
+qa/
