@@ -28,6 +28,9 @@ tabs shows the library. Closed projects are still saved and can be reopened.
 
 Counts describe the current work rather than setting a target. The interface avoids
 daily-goal slogans, estimated reading times, and a separate scene hierarchy.
+Headings and help text use plain, functional labels such as Outline, Characters,
+Notebook, and Export project. Avoid slogans, motivational phrases, writing-desk
+metaphors, and decorative sentences that do not explain a feature.
 
 The notebook supports both project-wide and chapter-specific notes. Attached notes
 are the same record wherever they are opened, so edits remain consistent. Drawings

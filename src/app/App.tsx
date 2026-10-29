@@ -520,7 +520,7 @@ export default function App() {
     return (
       <div className="loading">
         <Feather size={30} />
-        <p>Opening your writing desk…</p>
+        <p>Loading Writing Studio…</p>
       </div>
     );
   if (!book && library.books.length)
@@ -536,7 +536,7 @@ export default function App() {
         </header>
         <main>
           <span className="eyebrow">YOUR LIBRARY</span>
-          <h1>Open a project.</h1>
+          <h1>Open a project</h1>
           <p>Closed tabs stay saved here.</p>
           <ProjectChooser
             books={library.books}
@@ -551,7 +551,7 @@ export default function App() {
     return (
       <div className="loading">
         <CloudOff size={30} />
-        <h1>Your writing desk could not open</h1>
+        <h1>Writing Studio could not open</h1>
         <p>{library.error}</p>
         <button className="primary-button" onClick={() => location.reload()}>
           Try again
@@ -1172,8 +1172,7 @@ export default function App() {
             <div className="view-scroll">
               <div className="view-heading">
                 <div>
-                  <span className="eyebrow">THE BIG PICTURE</span>
-                  <h1>Your book, in order.</h1>
+                  <h1>Outline</h1>
                 </div>
                 <button
                   className="primary-button"
@@ -1296,12 +1295,8 @@ export default function App() {
             <div className="view-scroll">
               <div className="view-heading">
                 <div>
-                  <span className="eyebrow">CHARACTERS</span>
-                  <h1>Your characters.</h1>
-                  <p>
-                    Their names connect the manuscript to everything you know
-                    about them.
-                  </p>
+                  <h1>Characters</h1>
+                  <p>Character profiles, aliases, and manuscript references.</p>
                 </div>
                 <button
                   className="primary-button"
@@ -1348,7 +1343,7 @@ export default function App() {
                       onClick={makeCharacter}
                     >
                       <Plus size={16} />
-                      Create your first character
+                      Add character
                     </button>
                   }
                 />
@@ -1359,8 +1354,7 @@ export default function App() {
             <div className="view-scroll">
               <div className="view-heading">
                 <div>
-                  <span className="eyebrow">PROJECT NOTES</span>
-                  <h1>Your notebook.</h1>
+                  <h1>Notebook</h1>
                   <p>Standalone notes and notes linked to chapters.</p>
                 </div>
                 <button
@@ -1816,12 +1810,12 @@ export default function App() {
           title={
             (
               {
-                newBook: 'A new book',
+                newBook: 'New book',
                 newChapter: 'Add a chapter',
-                export: 'Take your writing with you',
+                export: 'Export project',
                 settings: 'Book details',
                 trash: 'Recently removed',
-                search: 'Find something in your book',
+                search: 'Search book',
                 moveScene: 'Move chapter',
                 help: 'Writing Studio help',
                 drawing: 'Add a drawing',
@@ -2322,36 +2316,35 @@ export default function App() {
           {modal === 'help' && (
             <div className="help-copy">
               <p>
-                <strong>Write in chapters.</strong> Open a chapter from Outline,
-                or select it in Manuscript. Use the chapter picker to jump
-                between chapters and Read whole book for the complete draft. Add
+                <strong>Chapters.</strong> Open a chapter from Outline, or
+                select it in Manuscript. Use the chapter picker to jump between
+                chapters and Read whole book for the complete draft. Add
                 chapters in the left sidebar. Reorder them by dragging or use
                 the arrows in Outline. Each chapter has a summary and a drafting
                 status.
               </p>
               <p>
-                <strong>Keep characters close.</strong> Add a character and
-                their aliases. Full names and unique first names are highlighted
-                in the editor; click one to open the card. Shared aliases are
-                left unlinked to avoid guessing.
+                <strong>Characters.</strong> Add a character and their aliases.
+                Full names and unique first names are highlighted in the editor;
+                click one to open the card. Shared aliases are left unlinked to
+                avoid guessing.
               </p>
               <p>
-                <strong>Revise with a way back.</strong> Save a chapter version
-                from the clock tab before making a big change. Removed chapters
+                <strong>Version history.</strong> Save a chapter version from
+                the clock tab before making a big change. Removed chapters
                 remain in Recently removed.
               </p>
               <p>
-                <strong>Your writing stays on your device.</strong> Automatic
-                saving uses this browser’s storage. Export backups regularly,
-                and use a backup to move between localhost and GitHub Pages.
-                This version does not sync between devices or load without the
-                website/server.
+                <strong>Local storage.</strong> Automatic saving uses this
+                browser’s storage. Export backups regularly, and use a backup to
+                move between localhost and GitHub Pages. This version does not
+                sync between devices or load without the website/server.
               </p>
               <p>
-                <strong>Find your focus.</strong> Use the expand button to hide
-                the panels. Escape closes the active dialog or panel, leaves
-                focus mode, or returns from Read whole book to your chapter.
-                Ctrl / ⌘ K searches your book.
+                <strong>Keyboard shortcuts.</strong> Use the expand button to
+                hide the panels. Escape closes the active dialog or panel,
+                leaves focus mode, or returns from Read whole book to your
+                chapter. Ctrl / ⌘ K searches your book.
               </p>
               <button
                 className="secondary-button"
