@@ -210,6 +210,7 @@ export default function App() {
   const [mobileNav, setMobileNav] = useState(false);
   const navigationToggle = useRef<HTMLButtonElement>(null);
   const contextToggle = useRef<HTMLButtonElement>(null);
+  const readingToggle = useRef<HTMLButtonElement>(null);
   const [modal, setModal] = useState<ModalName>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formAuthor, setFormAuthor] = useState('');
@@ -273,6 +274,11 @@ export default function App() {
         e.stopPropagation();
         setMobileNav(false);
         navigationToggle.current?.focus({ preventScroll: true });
+      } else if (view === 'read') {
+        e.preventDefault();
+        e.stopPropagation();
+        setView('write');
+        readingToggle.current?.focus({ preventScroll: true });
       } else if (view === 'write' && inspector) {
         e.preventDefault();
         e.stopPropagation();
@@ -1029,6 +1035,7 @@ export default function App() {
             <div className="workspace-actions">
               {(view === 'write' || view === 'read') && (
                 <button
+                  ref={readingToggle}
                   className="text-button reading-toggle"
                   onClick={() => {
                     if (view === 'write') {
@@ -2342,8 +2349,9 @@ export default function App() {
               </p>
               <p>
                 <strong>Find your focus.</strong> Use the expand button to hide
-                the panels. Escape closes the active dialog or panel, or leaves
-                focus mode. Ctrl / ⌘ K searches your book.
+                the panels. Escape closes the active dialog or panel, leaves
+                focus mode, or returns from Read whole book to your chapter.
+                Ctrl / ⌘ K searches your book.
               </p>
               <button
                 className="secondary-button"

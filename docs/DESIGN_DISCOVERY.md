@@ -20,7 +20,7 @@ The new-chapter dialog focuses its title field. Tab accepts the suggested number
 title, and Enter creates the chapter. Character cards and their name fields use a
 compact layout, with optional middle names and automatic matching of unique first names.
 Escape dismisses one active layer at a time: dialogs, mobile navigation, the context
-panel, or focus mode. Dialogs return keyboard focus to their opener. Within the
+panel, focus mode, or the whole-book reading view. Dialogs return keyboard focus to their opener. Within the
 project chooser, Escape returns from the new-project form to existing projects first.
 
 Project tabs are closable, and the library remains accessible through +. Closing all
