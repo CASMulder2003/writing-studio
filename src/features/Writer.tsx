@@ -6,6 +6,9 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { characterDecorations } from './characterReferences';
+import { WritingPages } from './WritingPages';
+import { PageControls } from './PageControls';
+import type { BookSize } from './bookFormat';
 import {
   Bold,
   Italic,
@@ -28,15 +31,33 @@ export function Writer({
   onChange,
   onCharacter,
   readOnly,
+  size,
+  onSize,
+  chapterTitle,
+  chapterNumber,
+  onPages,
 }: {
   scene: Scene;
   characters: Character[];
   onChange: (content: DocNode) => void;
   onCharacter: (id: string) => void;
   readOnly: boolean;
+  size: BookSize;
+  onSize: (size: BookSize) => void;
+  chapterTitle: string;
+  chapterNumber: number;
+  onPages: (pages: number) => void;
 }) {
   const imageInput = useRef<HTMLInputElement>(null);
   const [imageError, setImageError] = useState('');
+  const [zoom, setZoom] = useState('fit');
+  const [paged, setPaged] = useState(() => {
+    try {
+      return localStorage.getItem('writing-studio-page-view') !== 'continuous';
+    } catch {
+      return true;
+    }
+  });
   const current = useRef({ characters, onChange, onCharacter });
   current.current = { characters, onChange, onCharacter };
   const editor = useEditor({
@@ -237,12 +258,52 @@ export function Writer({
           }}
         />
       </div>
+      <div className="book-view-toolbar writing-view-toolbar">
+        <label className="writing-layout-label">
+          <span>Layout</span>
+          <select
+            aria-label="Writing layout"
+            value={paged ? 'pages' : 'continuous'}
+            onChange={(e) => {
+              const next = e.target.value === 'pages';
+              setPaged(next);
+              try {
+                localStorage.setItem(
+                  'writing-studio-page-view',
+                  next ? 'pages' : 'continuous',
+                );
+              } catch {
+                /* Optional preference. */
+              }
+            }}
+          >
+            <option value="pages">Pages</option>
+            <option value="continuous">Continuous</option>
+          </select>
+        </label>
+        <PageControls
+          size={size}
+          onSize={onSize}
+          zoom={zoom}
+          onZoom={setZoom}
+        />
+      </div>
       {imageError && (
         <p className="inline-error" role="alert">
           {imageError}
         </p>
       )}
-      <EditorContent editor={editor} />
+      <WritingPages
+        editor={editor}
+        size={size}
+        zoom={zoom}
+        paged={paged}
+        chapterTitle={chapterTitle}
+        chapterNumber={chapterNumber}
+        onPages={onPages}
+      >
+        <EditorContent editor={editor} />
+      </WritingPages>
     </>
   );
 }

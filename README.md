@@ -7,10 +7,11 @@ Built with React, TypeScript, and Tiptap; runs locally or as a static GitHub Pag
 
 - Switch projects from the project name at the top. Open chapters from Outline into closable tabs; each project remembers its tabs.
 - Write and reorder chapters, add summaries, and track Planned, Drafting, Revising, and Complete status.
-- See chapter and book word counts and estimated pages, without targets or reading-time goals.
+- See chapter and book word counts and formatted page counts, without targets or reading-time goals.
 - Keep compact character profiles with first, last, optional middle names, and aliases. Click highlighted full names or unique first names to open their profiles.
 - Write standalone notes or attach them to chapters. Add images, captions, and drawings to the notebook.
-- Use rich text, manuscript images, focus mode, search, and a compiled reading view.
+- Write on scrolling book-sized pages, or switch to Continuous layout. Screen zoom does not change the book's formatting.
+- Use rich text, manuscript images, focus mode, search, and a paginated reading view that shares the PDF layout.
 - Save chapter versions, restore earlier drafts, and recover removed chapters.
 - Export selected chapters as a novel-sized PDF with a title page, chapter openings, and page numbers. HTML and plain-text exports are also available.
 - Back up a complete project as JSON and import it as a separate copy.
@@ -27,9 +28,14 @@ the destination to move a project. Clearing browser data removes local projects.
 There is no account, cloud sync, or offline application cache. The website or
 local development server must be available to load the app.
 
-Page counts in the workspace are estimates based on text, line breaks, chapter
-openings, and images. The exported PDF provides the final pagination for its chosen
-trim size. An export includes only the selected chapters and excludes planning notes.
+Page counts recalculate from the PDF layout after edits. A tilde marks a temporary
+estimate while pagination is pending. Workspace totals count body pages; Read book
+also includes the title page and its blank reverse. Reading and PDF export share
+the same page layout. Writing uses the same Crimson Text 10.5 pt / 14 pt typography
+and trim size, with continuous editable text flowing across visual sheets. Its
+browser line breaks can differ slightly from the final PDF. The page size is
+remembered per project on this device and applies to writing, reading and PDF export.
+An export includes only the selected chapters and excludes planning notes.
 
 ## Run locally
 

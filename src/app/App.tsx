@@ -37,7 +37,6 @@ import {
   backup,
   bookWords,
   chapterWords,
-  estimatedBookPages,
   estimatedChapterPages,
   characterNameParts,
   updateCharacterName,
@@ -231,6 +230,88 @@ export default function App() {
   const [attachmentNoteId, setAttachmentNoteId] = useState('');
   const [selectedChapters, setSelectedChapters] = useState(new Set<string>());
   const [pdfSize, setPdfSize] = useState<'compact' | 'large'>('large');
+  const [layoutCounts, setLayoutCounts] = useState<{
+    chapters: Chapter[];
+    size: 'compact' | 'large';
+    counts: Record<string, number>;
+  }>();
+  const [writingCount, setWritingCount] = useState<{
+    scene: string;
+    size: string;
+    count: number;
+  }>();
+  const paginationCache = useRef(
+    new WeakMap<Chapter, Partial<Record<'compact' | 'large', number>>>(),
+  );
+  useEffect(() => {
+    if (!book) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const { createBookPreview } = await import('../features/bookPdf');
+        const counts: Record<string, number> = {};
+        for (const chapter of book.chapters) {
+          if (cancelled) return;
+          const cached = paginationCache.current.get(chapter) || {};
+          if (cached[pdfSize] === undefined) {
+            const preview = await createBookPreview(
+              { ...book, chapters: [chapter] },
+              new Set([chapter.id]),
+              pdfSize,
+            );
+            cached[pdfSize] = preview.pages.length - 2;
+            paginationCache.current.set(chapter, cached);
+            // Yield between chapters so a long book never blocks navigation.
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          counts[chapter.id] = cached[pdfSize]!;
+        }
+        if (!cancelled)
+          setLayoutCounts({ chapters: book.chapters, size: pdfSize, counts });
+      } catch {
+        /* Keep the estimate; Read book and Export report any font/image error. */
+      }
+    }, 800);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [book?.chapters, pdfSize]);
+  useEffect(() => {
+    try {
+      setPdfSize(
+        localStorage.getItem('writing-studio-size-' + book?.id) === 'compact'
+          ? 'compact'
+          : 'large',
+      );
+    } catch {
+      setPdfSize('large');
+    }
+  }, [book?.id]);
+  const changePageSize = (size: 'compact' | 'large') => {
+    setPdfSize(size);
+    try {
+      localStorage.setItem('writing-studio-size-' + book?.id, size);
+    } catch {
+      /* Optional view preference. */
+    }
+  };
+  const knownPages = (target: Chapter) =>
+    layoutCounts?.size === pdfSize && layoutCounts.chapters.includes(target)
+      ? layoutCounts.counts[target.id]
+      : undefined;
+  const chapterPageLabel = (target: Chapter) =>
+    knownPages(target) !== undefined
+      ? `${knownPages(target)} pages`
+      : `~${estimatedChapterPages(target)} pages`;
+  const allPagesKnown =
+    book && book.chapters.every((c) => knownPages(c) !== undefined);
+  const bodyPageCount =
+    book?.chapters.reduce(
+      (sum, c) =>
+        sum + (knownPages(c) ?? Math.max(1, estimatedChapterPages(c))),
+      0,
+    ) || 0;
   const [pdfBusy, setPdfBusy] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [editorVersion, setEditorVersion] = useState(0);
@@ -1007,11 +1088,11 @@ export default function App() {
           <div className="sidebar-bottom">
             <div
               className="book-statistics"
-              title="Approximate body pages in a compact novel format. Line breaks and chapter openings count. The PDF export gives the final pagination."
+              title="Body pages in the selected book size, excluding the title page and its blank reverse. Recalculated after edits; a tilde marks an estimate."
             >
               <div>
-                <strong>{estimatedBookPages(book)}</strong>
-                <span>estimated pages</span>
+                <strong>{bodyPageCount}</strong>
+                <span>{allPagesKnown ? 'body pages' : 'estimated pages'}</span>
               </div>
               <div>
                 <strong>{fmt(total)}</strong>
@@ -1225,6 +1306,19 @@ export default function App() {
                   <Writer
                     key={scene.id + '-' + editorVersion}
                     scene={scene}
+                    size={pdfSize}
+                    onSize={changePageSize}
+                    chapterTitle={chapter.title}
+                    chapterNumber={chapterIndex + 1}
+                    onPages={(count) =>
+                      setWritingCount((previous) =>
+                        previous?.scene === scene.id &&
+                        previous?.size === pdfSize &&
+                        previous?.count === count
+                          ? previous
+                          : { scene: scene.id, size: pdfSize, count },
+                      )
+                    }
                     characters={book.characters}
                     readOnly={readOnly}
                     onChange={(content: DocNode) => patchScene({ content })}
@@ -1240,8 +1334,12 @@ export default function App() {
               <footer className="editor-footer">
                 <span>
                   <strong>{fmt(count)}</strong> chapter words{' '}
-                  <span className="footer-separator">·</span> ~
-                  {estimatedChapterPages(chapter)} pages
+                  <span className="footer-separator">·</span>{' '}
+                  <span title="Writing pages are approximate. Read book shows the exact PDF layout.">
+                    {knownPages(chapter) !== undefined
+                      ? chapterPageLabel(chapter)
+                      : `~${writingCount?.scene === scene.id && writingCount.size === pdfSize ? writingCount.count : estimatedChapterPages(chapter)} pages`}
+                  </span>
                 </span>
                 <span>
                   Chapter {chapterIndex + 1} of {book.chapters.length}
@@ -1274,7 +1372,10 @@ export default function App() {
               </div>
               <div className="outline-summary">
                 <span>{book.chapters.length} chapters</span>
-                <span>~{estimatedBookPages(book)} pages</span>
+                <span>
+                  {allPagesKnown ? '' : '~'}
+                  {bodyPageCount} body pages
+                </span>
                 <span>{fmt(total)} words</span>
                 <span>
                   {book.chapters.filter((c) => c.status === 'Complete').length}{' '}
@@ -1337,8 +1438,7 @@ export default function App() {
                         ))}
                       </select>
                       <span>
-                        {fmt(chapterWords(c))} words · ~
-                        {estimatedChapterPages(c)} pages
+                        {fmt(chapterWords(c))} words · {chapterPageLabel(c)}
                       </span>
                     </div>
                     <div className="outline-controls">
@@ -1600,8 +1700,11 @@ export default function App() {
               book={book}
               jump={manuscriptJump}
               onEdit={chooseScene}
-              onAdd={() => open('newChapter')}
-              readOnly={readOnly}
+              size={pdfSize}
+              onSize={changePageSize}
+              onPageCounts={(counts, size) =>
+                setLayoutCounts({ chapters: book.chapters, size, counts })
+              }
             />
           )}
         </main>
@@ -2103,7 +2206,7 @@ export default function App() {
                   <select
                     value={pdfSize}
                     onChange={(e) =>
-                      setPdfSize(e.target.value as 'compact' | 'large')
+                      changePageSize(e.target.value as 'compact' | 'large')
                     }
                   >
                     <option value="compact">

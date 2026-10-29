@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { newBook, newChapter, type DocNode } from '../domain/book';
-import { createBookPdf, type PdfFonts } from './bookPdf';
+import { createBookPdf, createBookPreview, type PdfFonts } from './bookPdf';
 
 const fonts = Object.fromEntries(
   Object.entries({
@@ -23,6 +23,54 @@ const paragraph = (text: string): DocNode => ({
 });
 
 describe('book PDF layout', () => {
+  it('uses identical page counts, trim and chapter numbers for the reader and PDF', async () => {
+    const book = newBook('Shared layout', 'Test author');
+    const chapter = newChapter('A long chapter');
+    chapter.scenes[0].content = {
+      type: 'doc',
+      content: Array.from({ length: 60 }, () =>
+        paragraph('A distant light moved slowly across the water. '.repeat(5)),
+      ),
+    };
+    const last = newChapter('Final chapter');
+    last.scenes[0].content = {
+      type: 'doc',
+      content: [paragraph('The last line.')],
+    };
+    book.chapters.push(chapter, last);
+    const before = JSON.stringify(book);
+    for (const size of ['compact', 'large'] as const) {
+      const selected = new Set([chapter.id, last.id]);
+      const preview = await createBookPreview(book, selected, size, fonts);
+      const pdf = await createBookPdf(book, selected, size, fonts);
+      expect(preview.pages.length).toBe(pdf.getNumberOfPages());
+      expect(preview.width).toBeCloseTo(pdf.internal.pageSize.getWidth());
+      expect(preview.height).toBeCloseTo(pdf.internal.pageSize.getHeight());
+      expect(preview.pages[0].chapterId).toBeUndefined();
+      expect(preview.pages[1].elements).toEqual([]);
+      expect(preview.pages[2].number).toBe(1);
+      expect(preview.pages[2].chapterId).toBe(chapter.id);
+      expect(
+        preview.pages[2].elements.some(
+          (e) => e.kind === 'text' && e.text === 'CHAPTER 2',
+        ),
+      ).toBe(true);
+      expect(preview.pages.at(-1)?.chapterId).toBe(last.id);
+      expect(preview.pages.slice(2).every((p, i) => p.number === i + 1)).toBe(
+        true,
+      );
+      for (const page of preview.pages.slice(2))
+        for (const element of page.elements) {
+          if (element.kind === 'text') {
+            expect(element.y).toBeGreaterThan(0);
+            expect(element.y).toBeLessThan(preview.height);
+            expect(element.x).toBeGreaterThanOrEqual(16);
+            expect(element.x).toBeLessThan(preview.width - 16);
+          }
+        }
+    }
+    expect(JSON.stringify(book)).toBe(before);
+  });
   it('requires at least one chapter', async () => {
     await expect(
       createBookPdf(newBook(), new Set(), 'compact', fonts),

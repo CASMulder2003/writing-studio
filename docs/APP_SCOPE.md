@@ -24,7 +24,12 @@ provide a direct return to the outline.
 Automatic local saving, manual chapter versions, recovery of removed chapters,
 complete JSON backups, and validated imports protect the writing workflow. Selected
 chapters can be exported as a novel-style PDF, HTML, or plain text. Word counts and
-estimated pages describe the existing manuscript; there is no target or word limit.
+formatted pages describe the existing manuscript; there is no target or word limit.
+Read book shows scrollable sheets using the exact PDF layout, including front matter,
+chapter openings, mirrored margins, running headers and page numbers. The editor
+uses book-sized sheets and the same typefaces and spacing, with an optional Continuous
+layout. Its visual page breaks are approximate; PDF-based counts recalculate after
+edits. Page boundaries never alter the manuscript document or its undo history.
 
 ## Boundaries
 

@@ -1,4 +1,10 @@
 import { jsPDF } from 'jspdf';
+import {
+  bookDimensions,
+  bookFormat,
+  ptToMm,
+  type BookSize,
+} from './bookFormat';
 import { type Book, type DocNode, fileName } from '../domain/book';
 import {
   layoutParagraph,
@@ -9,8 +15,41 @@ import {
 } from './pdfLayout';
 
 export type PdfFonts = Record<FontStyle, string>;
-const bodySize = 10.5;
-const bodyLeading = (14 * 25.4) / 72;
+const bodySize = bookFormat.bodySize;
+const bodyLeading = ptToMm(bookFormat.leading);
+export type PageElement =
+  | {
+      kind: 'text';
+      text: string;
+      x: number;
+      y: number;
+      size: number;
+      style: FontStyle;
+      color: string;
+      align: 'left' | 'center';
+    }
+  | {
+      kind: 'line';
+      x: number;
+      y: number;
+      x2: number;
+      y2: number;
+      width: number;
+    }
+  | {
+      kind: 'image';
+      src: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+export type BookPage = {
+  chapterId?: string;
+  number?: number;
+  elements: PageElement[];
+};
+export type BookPreview = { width: number; height: number; pages: BookPage[] };
 type Block = {
   kind: 'text' | 'heading' | 'image' | 'rule';
   runs?: Run[];
@@ -106,23 +145,58 @@ function blocks(node: DocNode): Block[] {
     }));
   return (node.content || []).flatMap(blocks);
 }
-export async function createBookPdf(
+async function buildBook(
   book: Book,
   selectedIds: Set<string>,
-  size: 'compact' | 'large' = 'large',
+  size: BookSize = 'large',
   providedFonts?: PdfFonts,
 ) {
   const selected = book.chapters.filter((c) => selectedIds.has(c.id));
   if (!selected.length) throw new Error('Select at least one chapter.');
   const fonts = providedFonts || (await loadFonts());
-  const width = size === 'compact' ? 139.7 : 152.4,
-    height = size === 'compact' ? 215.9 : 228.6;
+  const { width, height } = bookDimensions(size);
   const doc = new jsPDF({
     unit: 'mm',
     format: [width, height],
     compress: true,
     putOnlyUsedFonts: true,
   });
+  const pages: BookPage[] = [{ elements: [] }];
+  let currentChapter: string | undefined;
+  const page = () => pages[doc.getCurrentPageInfo().pageNumber - 1];
+  const addPage = () => {
+    doc.addPage([width, height]);
+    pages.push({ chapterId: currentChapter, elements: [] });
+  };
+  const text = (
+    value: string,
+    x: number,
+    y: number,
+    options?: { align: 'center' },
+  ) => {
+    page().elements.push({
+      kind: 'text',
+      text: value,
+      x,
+      y,
+      size: doc.getFontSize(),
+      style: doc.getFont().fontStyle as FontStyle,
+      color: doc.getTextColor(),
+      align: options?.align || 'left',
+    });
+    doc.text(value, x, y, options);
+  };
+  const drawLine = (x: number, y: number, x2: number, y2: number) => {
+    page().elements.push({
+      kind: 'line',
+      x,
+      y,
+      x2,
+      y2,
+      width: doc.getLineWidth(),
+    });
+    doc.line(x, y, x2, y2);
+  };
   for (const style of Object.keys(fontFiles) as FontStyle[]) {
     doc.addFileToVFS(fontFiles[style], fonts[style]);
     doc.addFont(fontFiles[style], 'BookSerif', style);
@@ -142,7 +216,7 @@ export async function createBookPdf(
   ) as string[];
   let titleY = 62;
   for (const line of titleLines) {
-    doc.text(line, width / 2, titleY, { align: 'center' });
+    text(line, width / 2, titleY, { align: 'center' });
     titleY += 10;
   }
   if (book.author) {
@@ -151,22 +225,25 @@ export async function createBookPdf(
       book.author,
       width - 36,
     ) as string[]) {
-      doc.text(line, width / 2, titleY + 22, { align: 'center' });
+      text(line, width / 2, titleY + 22, { align: 'center' });
       titleY += 7;
     }
   }
   doc.setFontSize(8);
   doc.setTextColor(125);
-  doc.text('DRAFT', width / 2, height - 26, { align: 'center' });
+  text('DRAFT', width / 2, height - 26, { align: 'center' });
   // A blank verso places body page 1 on the right in a printed spread.
-  doc.addPage([width, height]);
+  addPage();
   let y = 0;
   let fontSize = bodySize;
-  const left = () => (doc.getNumberOfPages() % 2 === 1 ? 20 : 16);
-  const textWidth = width - 36;
+  const left = () =>
+    doc.getNumberOfPages() % 2 === 1
+      ? bookFormat.innerMargin
+      : bookFormat.outerMargin;
+  const textWidth = width - bookFormat.innerMargin - bookFormat.outerMargin;
   const startPage = () => {
-    doc.addPage([width, height]);
-    y = 24;
+    addPage();
+    y = bookFormat.top;
   };
   const measure = (run: Run) => {
     doc.setFont('BookSerif', run.style);
@@ -174,7 +251,7 @@ export async function createBookPdf(
     return doc.getTextWidth(run.text);
   };
   const renderLine = (line: TextLine, leading: number) => {
-    if (y > height - 22) {
+    if (y > height - bookFormat.bottom) {
       startPage();
     }
     let x = left() + line.indent;
@@ -183,16 +260,16 @@ export async function createBookPdf(
     for (const run of line.runs) {
       doc.setFont('BookSerif', run.style);
       doc.setFontSize(fontSize);
-      doc.text(run.text, x, y);
+      text(run.text, x, y);
       const span =
         doc.getTextWidth(run.text) + (/^\s+$/u.test(run.text) ? extraSpace : 0);
       if (run.underline) {
         doc.setLineWidth(0.16);
-        doc.line(x, y + 0.8, x + span, y + 0.8);
+        drawLine(x, y + 0.8, x + span, y + 0.8);
       }
       if (run.strike) {
         doc.setLineWidth(0.16);
-        doc.line(x, y - 1.1, x + span, y - 1.1);
+        drawLine(x, y - 1.1, x + span, y - 1.1);
       }
       x += span;
     }
@@ -200,12 +277,13 @@ export async function createBookPdf(
   };
   const openingPages = new Set<number>();
   for (const chapter of selected) {
+    currentChapter = chapter.id;
     startPage();
     openingPages.add(doc.getNumberOfPages());
     doc.setFont('BookSerif', 'normal');
     doc.setTextColor(105);
     doc.setFontSize(9);
-    doc.text(
+    text(
       `CHAPTER ${book.chapters.findIndex((c) => c.id === chapter.id) + 1}`,
       width / 2,
       35,
@@ -219,7 +297,7 @@ export async function createBookPdf(
     ) as string[];
     y = 46;
     for (const title of titles) {
-      doc.text(title, width / 2, y, { align: 'center' });
+      text(title, width / 2, y, { align: 'center' });
       y += 7.5;
     }
     y += 9;
@@ -231,7 +309,7 @@ export async function createBookPdf(
         doc.setFont('BookSerif', 'normal');
         doc.setFontSize(11);
         doc.setTextColor(100);
-        doc.text('* * *', width / 2, y + 5, { align: 'center' });
+        text('* * *', width / 2, y + 5, { align: 'center' });
         y += 15;
         firstParagraph = true;
         continue;
@@ -252,6 +330,14 @@ export async function createBookPdf(
         const iw = image.width * scale,
           ih = image.height * scale;
         if (y + ih > height - 23) startPage();
+        page().elements.push({
+          kind: 'image',
+          src: block.src,
+          x: left() + (textWidth - iw) / 2,
+          y,
+          width: iw,
+          height: ih,
+        });
         doc.addImage(block.src, left() + (textWidth - iw) / 2, y, iw, ih);
         y += ih + 9;
         firstParagraph = true;
@@ -267,11 +353,14 @@ export async function createBookPdf(
         block.runs || [],
         measure,
         textWidth,
-        block.kind === 'heading' || firstParagraph || block.list ? 0 : 5,
+        block.kind === 'heading' || firstParagraph || block.list
+          ? 0
+          : bookFormat.paragraphIndent,
       );
       for (let index = 0; index < lines.length; index++) {
         // Keep at least two paragraph lines together at either side of a page break.
-        const remaining = Math.floor((height - 22 - y) / leading) + 1;
+        const remaining =
+          Math.floor((height - bookFormat.bottom - y) / leading) + 1;
         if (
           remaining < 1 ||
           (index === 0 && remaining === 2 && lines.length === 3) ||
@@ -294,17 +383,34 @@ export async function createBookPdf(
   const totalPages = doc.getNumberOfPages();
   for (let page = 3; page <= totalPages; page++) {
     doc.setPage(page);
+    pages[page - 1].number = page - 2;
     doc.setFont('BookSerif', 'normal');
     doc.setTextColor(105);
     doc.setFontSize(8.5);
-    doc.text(String(page - 2), width / 2, height - 12, { align: 'center' });
+    text(String(page - 2), width / 2, height - 12, { align: 'center' });
     if (!openingPages.has(page)) {
       doc.setFontSize(8);
       const runningTitle = doc.splitTextToSize(book.title, textWidth)[0];
-      doc.text(runningTitle, width / 2, 13, { align: 'center' });
+      text(runningTitle, width / 2, 13, { align: 'center' });
     }
   }
-  return doc;
+  return { pdf: doc, preview: { width, height, pages } satisfies BookPreview };
+}
+export async function createBookPdf(
+  book: Book,
+  selectedIds: Set<string>,
+  size: BookSize = 'large',
+  fonts?: PdfFonts,
+) {
+  return (await buildBook(book, selectedIds, size, fonts)).pdf;
+}
+export async function createBookPreview(
+  book: Book,
+  selectedIds: Set<string>,
+  size: BookSize = 'large',
+  fonts?: PdfFonts,
+) {
+  return (await buildBook(book, selectedIds, size, fonts)).preview;
 }
 export async function downloadBookPdf(
   book: Book,

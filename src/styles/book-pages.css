@@ -1,0 +1,297 @@
+@font-face {
+  font-family: 'Book Crimson';
+  src: url('/fonts/CrimsonText-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Book Crimson';
+  src: url('/fonts/CrimsonText-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Book Crimson';
+  src: url('/fonts/CrimsonText-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Book Crimson';
+  src: url('/fonts/CrimsonText-BoldItalic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+.book-reader {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.book-view-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbf7;
+  font-size: 11px;
+  color: #727c70;
+}
+.page-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+.page-controls label,
+.writing-layout-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.book-view-toolbar select {
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 5px;
+  padding: 5px 7px;
+  color: #465548;
+  font-size: 11px;
+}
+.book-reading-scroll {
+  padding: 30px 24px;
+  background: #edefe9;
+}
+.book-page-viewport {
+  width: 100%;
+  min-width: 0;
+}
+.book-page-stack {
+  margin: 0 auto;
+}
+.book-sheet {
+  margin: 0 0 28px;
+  scroll-margin-top: 12px;
+}
+.book-page {
+  display: block;
+  background: white;
+  box-shadow: 0 2px 10px #283a2712;
+  outline: 1px solid #dfe2da;
+  font-family: 'Book Crimson', Georgia, serif;
+  font-kerning: none;
+  font-variant-ligatures: none;
+}
+.book-chapter-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  font-size: 10px;
+  color: #75816f;
+  padding: 8px 0;
+}
+.book-chapter-action .text-button {
+  font-size: 10px;
+}
+.editor-scroll {
+  padding: 20px 24px 36px;
+  background: #edefe9;
+}
+.chapter-heading {
+  max-width: 760px;
+  margin-bottom: 16px;
+}
+.chapter-heading .chapter-title-input {
+  font-size: 23px;
+  margin: 0;
+}
+.chapter-heading .chapter-kicker {
+  margin-bottom: 7px;
+}
+.paper,
+.focus-mode .paper {
+  max-width: none;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.paper .editor-toolbar {
+  background: #fafbf7;
+  border: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  padding: 7px 12px;
+  min-height: 40px;
+}
+.writing-view-toolbar {
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  padding: 8px 12px;
+}
+.writing-page-viewport {
+  margin-top: 22px;
+}
+.writing-pages {
+  position: relative;
+  margin: 0 auto;
+  color: #141414;
+  font-family: 'Book Crimson', Georgia, serif;
+}
+.writing-pages.is-continuous {
+  background: white;
+  box-shadow: 0 2px 10px #283a2712;
+}
+.writing-page-backgrounds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.writing-page-background {
+  position: absolute;
+  width: 100%;
+  background: white;
+  outline: 1px solid #dfe2da;
+  box-shadow: 0 2px 10px #283a2712;
+}
+.writing-page-background > span {
+  position: absolute;
+  bottom: 10mm;
+  width: 100%;
+  text-align: center;
+  font-size: 8.5pt;
+  color: #696969;
+}
+.writing-chapter-opening {
+  position: absolute;
+  z-index: 1;
+  top: 31.5mm;
+  left: 20mm;
+  right: 16mm;
+  text-align: center;
+  pointer-events: none;
+}
+.writing-chapter-opening > span {
+  font-size: 9pt;
+  color: #696969;
+}
+.writing-chapter-opening > div {
+  margin-top: 5mm;
+  font-size: 18pt;
+  line-height: 7.5mm;
+  overflow-wrap: anywhere;
+}
+.book-writing-flow {
+  position: relative;
+  padding: var(--body-start) var(--book-outer) var(--book-bottom)
+    var(--book-inner);
+}
+.page-exclusions {
+  float: left;
+  width: 100%;
+  pointer-events: none;
+}
+.writing-pages .manuscript-editor {
+  padding: 0;
+  min-height: 1em;
+  font-family: 'Book Crimson', Georgia, serif;
+  font-size: var(--book-body-size);
+  line-height: var(--book-leading);
+  font-kerning: none;
+  font-variant-ligatures: none;
+  color: #141414;
+  text-align: justify;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.writing-pages .manuscript-editor p {
+  margin: 0;
+  text-indent: var(--book-indent);
+}
+.writing-pages .manuscript-editor > p:first-child,
+.writing-pages .manuscript-editor h2 + p,
+.writing-pages .manuscript-editor hr + p,
+.writing-pages .manuscript-editor p:has(img),
+.writing-pages .manuscript-editor p:has(img) + p,
+.writing-pages .manuscript-editor li p {
+  text-indent: 0;
+}
+.writing-pages .manuscript-editor h1,
+.writing-pages .manuscript-editor h2,
+.writing-pages .manuscript-editor h3 {
+  font:
+    400 13pt/17pt 'Book Crimson',
+    Georgia,
+    serif;
+  margin: 4mm 0;
+  text-align: left;
+}
+.writing-pages .manuscript-editor ul,
+.writing-pages .manuscript-editor ol {
+  margin: 0;
+  padding-left: 5mm;
+}
+.writing-pages .manuscript-editor blockquote {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+}
+.writing-pages .manuscript-editor pre {
+  margin: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  white-space: pre-wrap;
+}
+.writing-pages .manuscript-editor hr {
+  margin: 5mm 0;
+  height: 5mm;
+  line-height: 5mm;
+}
+.writing-pages .manuscript-editor img {
+  display: inline;
+  max-width: 100%;
+  max-height: calc(var(--book-height) - 54mm);
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0;
+  vertical-align: top;
+}
+.writing-pages .manuscript-editor .is-editor-empty:first-child:before {
+  text-indent: 0;
+  font-size: inherit;
+}
+.page-end {
+  display: none;
+}
+@media (max-width: 780px) {
+  .editor-scroll,
+  .focus-mode .editor-scroll {
+    padding: 14px 12px 30px;
+  }
+  .book-reading-scroll {
+    padding: 20px 12px;
+  }
+  .book-view-toolbar {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .book-view-toolbar > span {
+    font-size: 10px;
+  }
+  .page-controls {
+    gap: 10px;
+  }
+}
