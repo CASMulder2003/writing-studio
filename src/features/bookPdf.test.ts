@@ -23,6 +23,35 @@ const paragraph = (text: string): DocNode => ({
 });
 
 describe('book PDF layout', () => {
+  it('keeps prologue and epilogue headings unnumbered, including in partial exports', async () => {
+    const book = newBook('Section types');
+    const prologue = newChapter('Prologue', 'prologue');
+    const second = newChapter('Return');
+    const epilogue = newChapter('Years later', 'epilogue');
+    book.chapters = [prologue, book.chapters[0], second, epilogue];
+    for (const chapter of book.chapters)
+      chapter.scenes[0].content = {
+        type: 'doc',
+        content: [paragraph('A short passage.')],
+      };
+    const selected = new Set([prologue.id, second.id, epilogue.id]);
+    const preview = await createBookPreview(book, selected, 'large', fonts);
+    const headings = preview.pages
+      .slice(2)
+      .map((p) =>
+        p.elements
+          .filter((e) => e.kind === 'text' && e.y < 60)
+          .map((e) => e.kind === 'text' && e.text),
+      );
+    expect(headings).toEqual([
+      ['Prologue'],
+      ['CHAPTER 2', 'Return'],
+      ['EPILOGUE', 'Years later'],
+    ]);
+    expect(preview.pages.slice(2).map((p) => p.number)).toEqual([1, 2, 3]);
+    const pdf = await createBookPdf(book, selected, 'large', fonts);
+    expect(pdf.getNumberOfPages()).toBe(preview.pages.length);
+  });
   it('uses identical page counts, trim and chapter numbers for the reader and PDF', async () => {
     const book = newBook('Shared layout', 'Test author');
     const chapter = newChapter('A long chapter');

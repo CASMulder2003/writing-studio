@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { FileText, X } from 'lucide-react';
-import type { Chapter } from '../domain/book';
+import { chapterListTitle, type Chapter } from '../domain/book';
 
 export function ChapterTabs({
   chapters,
@@ -8,7 +8,7 @@ export function ChapterTabs({
   onOpen,
   onClose,
 }: {
-  chapters: { chapter: Chapter; number: number }[];
+  chapters: { chapter: Chapter; number: number | null }[];
   activeId?: string;
   onOpen: (chapter: Chapter) => void;
   onClose: (id: string) => void;
@@ -80,13 +80,11 @@ export function ChapterTabs({
           <button
             role="tab"
             aria-selected={activeId === chapter.id}
-            title={`Chapter ${number}: ${chapter.title}`}
+            title={chapterListTitle(chapter, number)}
             onClick={() => onOpen(chapter)}
           >
             <FileText size={14} />
-            <span>
-              {number}. {chapter.title || 'Untitled chapter'}
-            </span>
+            <span>{chapterListTitle(chapter, number)}</span>
           </button>
           <button
             className="close-chapter-tab"

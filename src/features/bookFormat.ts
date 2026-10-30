@@ -1,4 +1,5 @@
 export type BookSize = 'compact' | 'large';
+export const defaultBookSize: BookSize = 'large';
 export const bookFormat = {
   bodySize: 10.5,
   leading: 14,

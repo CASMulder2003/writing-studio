@@ -33,6 +33,9 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useLibrary } from '../storage/useLibrary';
+import { EntryMenu } from '../features/EntryMenu';
+import { NotebookIndex } from '../features/NotebookIndex';
+import { defaultBookSize } from '../features/bookFormat';
 import {
   backup,
   bookWords,
@@ -49,11 +52,24 @@ import {
   mentions,
   newBook,
   newChapter,
+  chapterKinds,
+  chapterKindNames,
+  chapterNumber,
+  chapterLabel,
+  chapterListTitle,
+  chapterOpening,
+  numberedChapters,
+  orderChapters,
+  changeChapterKind,
+  type ChapterKind,
   parseBackup,
   plainText,
   reorder,
   removeCharacter,
   restoreCharacter,
+  removeNote,
+  restoreNote,
+  moveNote,
   statuses,
   words,
   type Book,
@@ -217,6 +233,12 @@ export default function App() {
   const characterDeleteButton = useRef<HTMLButtonElement>(null);
   const addCharacterButton = useRef<HTMLButtonElement>(null);
   const [noteId, setNoteId] = useState('');
+  const [noteResetKey, setNoteResetKey] = useState(0);
+  const noteMenuButton = useRef<HTMLButtonElement>(null);
+  const addNoteButton = useRef<HTMLButtonElement>(null);
+  const noteTitleInput = useRef<HTMLInputElement>(null);
+  const noteScroll = useRef<HTMLDivElement>(null);
+  const addSectionButton = useRef<HTMLButtonElement>(null);
   const [focus, setFocus] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const navigationToggle = useRef<HTMLButtonElement>(null);
@@ -225,6 +247,7 @@ export default function App() {
   const outlineLink = useRef<HTMLButtonElement>(null);
   const [modal, setModal] = useState<ModalName>(null);
   const [formTitle, setFormTitle] = useState('');
+  const [formKind, setFormKind] = useState<ChapterKind>('chapter');
   const [formAuthor, setFormAuthor] = useState('');
   const [formError, setFormError] = useState('');
   const [search, setSearch] = useState('');
@@ -233,7 +256,8 @@ export default function App() {
   const [contextNoteId, setContextNoteId] = useState('');
   const [attachmentNoteId, setAttachmentNoteId] = useState('');
   const [selectedChapters, setSelectedChapters] = useState(new Set<string>());
-  const [pdfSize, setPdfSize] = useState<'compact' | 'large'>('large');
+  const [pdfSize, setPdfSize] = useState<'compact' | 'large'>(defaultBookSize);
+  const pageSize = defaultBookSize;
   const [layoutCounts, setLayoutCounts] = useState<{
     chapters: Chapter[];
     size: 'compact' | 'large';
@@ -257,21 +281,21 @@ export default function App() {
         for (const chapter of book.chapters) {
           if (cancelled) return;
           const cached = paginationCache.current.get(chapter) || {};
-          if (cached[pdfSize] === undefined) {
+          if (cached[pageSize] === undefined) {
             const preview = await createBookPreview(
               { ...book, chapters: [chapter] },
               new Set([chapter.id]),
-              pdfSize,
+              pageSize,
             );
-            cached[pdfSize] = preview.pages.length - 2;
+            cached[pageSize] = preview.pages.length - 2;
             paginationCache.current.set(chapter, cached);
             // Yield between chapters so a long book never blocks navigation.
             await new Promise((resolve) => setTimeout(resolve, 0));
           }
-          counts[chapter.id] = cached[pdfSize]!;
+          counts[chapter.id] = cached[pageSize]!;
         }
         if (!cancelled)
-          setLayoutCounts({ chapters: book.chapters, size: pdfSize, counts });
+          setLayoutCounts({ chapters: book.chapters, size: pageSize, counts });
       } catch {
         /* Keep the estimate; Read book and Export report any font/image error. */
       }
@@ -280,28 +304,9 @@ export default function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [book?.chapters, pdfSize]);
-  useEffect(() => {
-    try {
-      setPdfSize(
-        localStorage.getItem('writing-studio-size-' + book?.id) === 'compact'
-          ? 'compact'
-          : 'large',
-      );
-    } catch {
-      setPdfSize('large');
-    }
-  }, [book?.id]);
-  const changePageSize = (size: 'compact' | 'large') => {
-    setPdfSize(size);
-    try {
-      localStorage.setItem('writing-studio-size-' + book?.id, size);
-    } catch {
-      /* Optional view preference. */
-    }
-  };
+  }, [book?.chapters, pageSize]);
   const knownPages = (target: Chapter) =>
-    layoutCounts?.size === pdfSize && layoutCounts.chapters.includes(target)
+    layoutCounts?.size === pageSize && layoutCounts.chapters.includes(target)
       ? layoutCounts.counts[target.id]
       : undefined;
   const chapterPageLabel = (target: Chapter) =>
@@ -378,6 +383,12 @@ export default function App() {
         setModal('search');
       }
       if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+      if (
+        document.querySelector('[data-entry-menu]') ||
+        (e.target instanceof Element &&
+          e.target.closest('[data-local-escape="true"]'))
+      )
+        return;
       // Native dialogs handle their own cancellation, leaving lower layers open.
       if (modal) return;
       if (focus) {
@@ -473,8 +484,10 @@ export default function App() {
   };
   const open = (name: ModalName) => {
     setFormTitle('');
+    setFormKind('chapter');
     setFormAuthor('');
     setFormError('');
+    if (name === 'export') setPdfSize(defaultBookSize);
     if (name === 'export')
       setSelectedChapters(
         new Set(bookRef.current?.chapters.map((c) => c.id) || []),
@@ -512,7 +525,10 @@ export default function App() {
     setInspectorTab('character');
   };
   const moveChapter = (cid: string, index: number) =>
-    mutate((b) => ({ ...b, chapters: reorder(b.chapters, cid, index) }));
+    mutate((b) => ({
+      ...b,
+      chapters: orderChapters(reorder(b.chapters, cid, index)),
+    }));
   const makeCharacter = () => {
     const c: Character = {
       id: id(),
@@ -542,8 +558,43 @@ export default function App() {
     };
     mutate((b) => ({ ...b, notes: [...b.notes, n] }));
     setNoteId(n.id);
+    setNoteResetKey((n) => n + 1);
     if (chapterId) setContextNoteId(n.id);
-    else setView('notes');
+    else {
+      setView('notes');
+      setMobileNav(false);
+      requestAnimationFrame(() => {
+        noteScroll.current?.scrollTo({ top: 0 });
+        noteTitleInput.current?.select();
+      });
+    }
+  };
+  const openNote = (note: Note) => {
+    setNoteId(note.id);
+    setView('notes');
+    setMobileNav(false);
+    requestAnimationFrame(() => noteScroll.current?.scrollTo({ top: 0 }));
+  };
+  const deleteNote = (nid: string) => {
+    mutate((b) => removeNote(b, nid));
+    setContextNoteId('');
+    if (noteId === nid) setNoteId('');
+    setToast('Note moved to Recently removed.');
+    requestAnimationFrame(() =>
+      (noteMenuButton.current || addNoteButton.current)?.focus({
+        preventScroll: true,
+      }),
+    );
+  };
+  const reorderNote = (
+    nid: string,
+    chapterId: string | null,
+    beforeId?: string,
+  ) => {
+    mutate((b) => ({
+      ...b,
+      notes: moveNote(b.notes, nid, chapterId, beforeId),
+    }));
   };
   const patchNote = (nid: string, patch: Partial<Note>) =>
     mutate((b) => ({
@@ -615,7 +666,7 @@ export default function App() {
   };
   const removeChapter = (cid: string) => {
     if (!book || book.chapters.length === 1) {
-      setToast('Keep at least one chapter in your book.');
+      setToast('Keep at least one section in your book.');
       return;
     }
     mutate((b) => ({
@@ -629,7 +680,10 @@ export default function App() {
       ],
       chapters: b.chapters.filter((c) => c.id !== cid),
     }));
-    setToast('Chapter moved to Recently removed.');
+    setToast('Section moved to Recently removed.');
+    requestAnimationFrame(() =>
+      addSectionButton.current?.focus({ preventScroll: true }),
+    );
   };
   const importFile = async (file: File | undefined) => {
     if (!file) return;
@@ -698,6 +752,13 @@ export default function App() {
     book.characters.find((c) => c.id === characterId) || book.characters[0];
   const note = book.notes.find((n) => n.id === noteId) || book.notes[0];
   const chapterIndex = book.chapters.findIndex((c) => c.id === chapter.id);
+  const regularChapters = numberedChapters(book.chapters);
+  const currentNumber = chapterNumber(book.chapters, chapter.id);
+  const openingHeading = chapterOpening(chapter, currentNumber);
+  const suggestedTitle =
+    formKind === 'chapter'
+      ? `Chapter ${regularChapters.length + 1}`
+      : chapterKindNames[formKind];
   const chapterNotes = book.notes.filter((n) => n.chapterId === chapter.id);
   const contextNote = chapterNotes.find((n) => n.id === contextNoteId);
   const selectedBook = {
@@ -745,13 +806,37 @@ export default function App() {
           {character.name.slice(0, 1).toUpperCase() || '?'}
         </span>
         <strong>{character.name || 'New character'}</strong>
-        <button
-          ref={characterDeleteButton}
-          className="text-button character-delete"
-          aria-label="Delete character"
-          title="Move this character to Recently removed"
+        <EntryMenu
+          triggerRef={characterDeleteButton}
+          label={character.name || 'Character'}
           disabled={readOnly}
-          onClick={() => {
+          onUp={
+            book.characters.indexOf(character) > 0
+              ? () =>
+                  mutate((b) => ({
+                    ...b,
+                    characters: reorder(
+                      b.characters,
+                      character.id,
+                      b.characters.findIndex((c) => c.id === character.id) - 1,
+                    ),
+                  }))
+              : undefined
+          }
+          onDown={
+            book.characters.indexOf(character) < book.characters.length - 1
+              ? () =>
+                  mutate((b) => ({
+                    ...b,
+                    characters: reorder(
+                      b.characters,
+                      character.id,
+                      b.characters.findIndex((c) => c.id === character.id) + 1,
+                    ),
+                  }))
+              : undefined
+          }
+          onDelete={() => {
             if (readOnly) return;
             const index = book.characters.findIndex(
               (c) => c.id === character.id,
@@ -770,10 +855,7 @@ export default function App() {
               )?.focus({ preventScroll: true }),
             );
           }}
-        >
-          <Trash2 size={14} />
-          Delete
-        </button>
+        />
       </div>
       <div className="character-name-fields">
         <label>
@@ -914,7 +996,7 @@ export default function App() {
         <ChapterTabs
           chapters={chapterTabs.ids.map((id) => ({
             chapter: book.chapters.find((c) => c.id === id)!,
-            number: book.chapters.findIndex((c) => c.id === id) + 1,
+            number: chapterNumber(book.chapters, id),
           }))}
           activeId={view === 'write' ? chapter.id : undefined}
           onOpen={(target) => chooseScene(target.scenes[0].id)}
@@ -983,7 +1065,7 @@ export default function App() {
             }}
           />
         )}
-        <aside className="sidebar">
+        <aside className={`sidebar ${view === 'notes' ? 'notes-sidebar' : ''}`}>
           <nav className="main-nav" aria-label="Workspace">
             {navItems.map((n) => (
               <button
@@ -1004,6 +1086,9 @@ export default function App() {
                 {n.id === 'characters' && book.characters.length > 0 && (
                   <span className="nav-count">{book.characters.length}</span>
                 )}
+                {n.id === 'notes' && book.notes.length > 0 && (
+                  <span className="nav-count">{book.notes.length}</span>
+                )}
               </button>
             ))}
           </nav>
@@ -1013,7 +1098,7 @@ export default function App() {
                 ? 'CHARACTER CARDS'
                 : view === 'notes'
                   ? 'YOUR NOTES'
-                  : 'CHAPTERS'}
+                  : 'CONTENTS'}
             </span>
             <button
               className="icon-button"
@@ -1022,7 +1107,7 @@ export default function App() {
                   ? 'Add character'
                   : view === 'notes'
                     ? 'Add note'
-                    : 'Add chapter'
+                    : 'Add section'
               }
               disabled={readOnly}
               onClick={() =>
@@ -1047,81 +1132,123 @@ export default function App() {
                   : 'Chapter list'
             }
           >
-            {view === 'characters'
-              ? book.characters.map((c) => (
-                  <button
-                    key={c.id}
-                    className={`simple-list-item ${character?.id === c.id ? 'active' : ''}`}
-                    onClick={() => setCharacterId(c.id)}
-                  >
-                    <span className="avatar mini">{c.name.slice(0, 1)}</span>
-                    <span>
-                      {c.name || 'Unnamed character'}
-                      <small>{c.role || 'Character'}</small>
+            {view === 'characters' ? (
+              book.characters.map((c, index) => (
+                <button
+                  key={c.id}
+                  className={`simple-list-item ${character?.id === c.id ? 'active' : ''}`}
+                  onClick={() => setCharacterId(c.id)}
+                  draggable={!readOnly}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(
+                      'application/x-writing-studio-character',
+                      c.id,
+                    );
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDragging(c.id);
+                  }}
+                  onDragEnd={() => setDragging('')}
+                  onDragOver={(e) => {
+                    if (
+                      e.dataTransfer.types.includes(
+                        'application/x-writing-studio-character',
+                      )
+                    )
+                      e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const cid = e.dataTransfer.getData(
+                      'application/x-writing-studio-character',
+                    );
+                    if (cid)
+                      mutate((b) => ({
+                        ...b,
+                        characters: reorder(b.characters, cid, index),
+                      }));
+                    setDragging('');
+                  }}
+                >
+                  <GripVertical size={12} className="list-grip" />
+                  <span className="avatar mini">{c.name.slice(0, 1)}</span>
+                  <span>
+                    {c.name || 'Unnamed character'}
+                    <small>{c.role || 'Character'}</small>
+                  </span>
+                </button>
+              ))
+            ) : view === 'notes' ? (
+              <NotebookIndex
+                key={book.id}
+                book={book}
+                activeId={note?.id}
+                resetKey={noteResetKey}
+                readOnly={readOnly}
+                onOpen={openNote}
+                onDelete={deleteNote}
+                onMove={reorderNote}
+              />
+            ) : (
+              book.chapters.map((c, i) => (
+                <div
+                  key={c.id}
+                  className={`chapter-item ${chapter.id === c.id && (view === 'write' || view === 'read') ? 'active' : ''} ${dragging === c.id ? 'dragging' : ''}`}
+                  draggable={!readOnly}
+                  onDragStart={(e) => {
+                    setDragging(c.id);
+                    e.dataTransfer.setData('text/plain', c.id);
+                  }}
+                  onDragEnd={() => setDragging('')}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    moveChapter(e.dataTransfer.getData('text/plain'), i);
+                    setDragging('');
+                  }}
+                >
+                  <div className="chapter-row">
+                    <span className="chapter-drag">
+                      <GripVertical size={12} />
                     </span>
-                  </button>
-                ))
-              : view === 'notes'
-                ? book.notes.map((n) => (
                     <button
-                      key={n.id}
-                      className={`simple-list-item ${note?.id === n.id ? 'active' : ''}`}
-                      onClick={() => setNoteId(n.id)}
+                      className="chapter-select"
+                      aria-current={
+                        chapter.id === c.id &&
+                        (view === 'write' || view === 'read')
+                          ? 'page'
+                          : undefined
+                      }
+                      onClick={() => chooseChapter(c)}
                     >
-                      <FileText size={16} />
-                      <span>{n.title || 'Untitled note'}</span>
+                      <span className="chapter-number">
+                        {chapterNumber(book.chapters, c.id) === null ? (
+                          <FileText size={14} />
+                        ) : (
+                          String(chapterNumber(book.chapters, c.id)).padStart(
+                            2,
+                            '0',
+                          )
+                        )}
+                      </span>
+                      <span className="chapter-name">
+                        {c.kind === 'chapter'
+                          ? c.title || 'Untitled chapter'
+                          : chapterListTitle(c, null)}
+                        <small>{fmt(chapterWords(c))} words</small>
+                      </span>
+                      <span
+                        className={'status-dot ' + c.status.toLowerCase()}
+                      />
                     </button>
-                  ))
-                : book.chapters.map((c, i) => (
-                    <div
-                      key={c.id}
-                      className={`chapter-item ${chapter.id === c.id && (view === 'write' || view === 'read') ? 'active' : ''} ${dragging === c.id ? 'dragging' : ''}`}
-                      draggable={!readOnly}
-                      onDragStart={(e) => {
-                        setDragging(c.id);
-                        e.dataTransfer.setData('text/plain', c.id);
-                      }}
-                      onDragEnd={() => setDragging('')}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        moveChapter(e.dataTransfer.getData('text/plain'), i);
-                        setDragging('');
-                      }}
-                    >
-                      <div className="chapter-row">
-                        <span className="chapter-drag">
-                          <GripVertical size={12} />
-                        </span>
-                        <button
-                          className="chapter-select"
-                          aria-current={
-                            chapter.id === c.id &&
-                            (view === 'write' || view === 'read')
-                              ? 'page'
-                              : undefined
-                          }
-                          onClick={() => chooseChapter(c)}
-                        >
-                          <span className="chapter-number">
-                            {String(i + 1).padStart(2, '0')}
-                          </span>
-                          <span className="chapter-name">
-                            {c.title || 'Untitled chapter'}
-                            <small>{fmt(chapterWords(c))} words</small>
-                          </span>
-                          <span
-                            className={'status-dot ' + c.status.toLowerCase()}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
           <div className="sidebar-bottom">
             <div
               className="book-statistics"
-              title="Body pages in the selected book size, excluding the title page and its blank reverse. Recalculated after edits; a tilde marks an estimate."
+              title="Body pages in the standard 6 × 9 inch layout, excluding the title page and its blank reverse. Recalculated after edits; a tilde marks an estimate."
             >
               <div>
                 <strong>{bodyPageCount}</strong>
@@ -1132,17 +1259,21 @@ export default function App() {
                 <span>words</span>
               </div>
               <p>
-                {book.chapters.filter((c) => c.status === 'Complete').length}{' '}
+                {regularChapters.filter((c) => c.status === 'Complete').length}{' '}
                 complete <span>·</span>{' '}
-                {book.chapters.filter((c) => c.status !== 'Complete').length} in
-                progress
+                {regularChapters.filter((c) => c.status !== 'Complete').length}{' '}
+                in progress
               </p>
             </div>
             <div className="sidebar-utilities">
               <button onClick={() => open('trash')}>
                 <Trash2 size={14} />
                 Recently removed
-                {book.trash.length > 0 && ` (${book.trash.length})`}
+                {book.trash.length +
+                  book.removedCharacters.length +
+                  book.removedNotes.length >
+                  0 &&
+                  ` (${book.trash.length + book.removedCharacters.length + book.removedNotes.length})`}
               </button>
               <button
                 className="icon-button"
@@ -1197,9 +1328,9 @@ export default function App() {
                     if (target) chooseChapter(target);
                   }}
                 >
-                  {book.chapters.map((c, index) => (
+                  {book.chapters.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {index + 1}. {c.title || 'Untitled chapter'}
+                      {chapterListTitle(c, chapterNumber(book.chapters, c.id))}
                     </option>
                   ))}
                 </select>
@@ -1311,7 +1442,7 @@ export default function App() {
               <div className="editor-scroll" ref={editorScroll}>
                 <div className="chapter-heading">
                   <div className="chapter-kicker">
-                    CHAPTER {String(chapterIndex + 1).padStart(2, '0')}
+                    {chapterLabel(book.chapters, chapter, true).toUpperCase()}
                     <span />
                     <select
                       aria-label="Chapter status"
@@ -1339,17 +1470,16 @@ export default function App() {
                   <Writer
                     key={scene.id + '-' + editorVersion}
                     scene={scene}
-                    size={pdfSize}
-                    onSize={changePageSize}
-                    chapterTitle={chapter.title}
-                    chapterNumber={chapterIndex + 1}
+                    size={pageSize}
+                    chapterTitle={openingHeading.title}
+                    chapterLabel={openingHeading.label}
                     onPages={(count) =>
                       setWritingCount((previous) =>
                         previous?.scene === scene.id &&
-                        previous?.size === pdfSize &&
+                        previous?.size === pageSize &&
                         previous?.count === count
                           ? previous
-                          : { scene: scene.id, size: pdfSize, count },
+                          : { scene: scene.id, size: pageSize, count },
                       )
                     }
                     characters={book.characters}
@@ -1366,16 +1496,19 @@ export default function App() {
               </div>
               <footer className="editor-footer">
                 <span>
-                  <strong>{fmt(count)}</strong> chapter words{' '}
+                  <strong>{fmt(count)}</strong>{' '}
+                  {chapter.kind === 'chapter' ? 'chapter' : chapter.kind} words{' '}
                   <span className="footer-separator">·</span>{' '}
                   <span title="Writing pages are approximate. Read book shows the exact PDF layout.">
                     {knownPages(chapter) !== undefined
                       ? chapterPageLabel(chapter)
-                      : `~${writingCount?.scene === scene.id && writingCount.size === pdfSize ? writingCount.count : estimatedChapterPages(chapter)} pages`}
+                      : `~${writingCount?.scene === scene.id && writingCount.size === pageSize ? writingCount.count : estimatedChapterPages(chapter)} pages`}
                   </span>
                 </span>
                 <span>
-                  Chapter {chapterIndex + 1} of {book.chapters.length}
+                  {currentNumber === null
+                    ? chapterKindNames[chapter.kind]
+                    : `Chapter ${currentNumber} of ${regularChapters.length}`}
                 </span>
               </footer>
             </>
@@ -1398,24 +1531,47 @@ export default function App() {
                   className="primary-button"
                   disabled={readOnly}
                   onClick={() => open('newChapter')}
+                  ref={addSectionButton}
                 >
                   <Plus size={16} />
-                  Add chapter
+                  Add section
                 </button>
               </div>
               <div className="outline-summary">
-                <span>{book.chapters.length} chapters</span>
+                <span>
+                  {regularChapters.length}{' '}
+                  {regularChapters.length === 1 ? 'chapter' : 'chapters'}
+                </span>
+                {(['prologue', 'epilogue'] as const).map((kind) => {
+                  const count = book.chapters.filter(
+                    (c) => c.kind === kind,
+                  ).length;
+                  return (
+                    count > 0 && (
+                      <span key={kind}>
+                        {count} {kind}
+                        {count === 1 ? '' : 's'}
+                      </span>
+                    )
+                  );
+                })}
                 <span>
                   {allPagesKnown ? '' : '~'}
                   {bodyPageCount} body pages
                 </span>
                 <span>{fmt(total)} words</span>
                 <span>
-                  {book.chapters.filter((c) => c.status === 'Complete').length}{' '}
+                  {
+                    regularChapters.filter((c) => c.status === 'Complete')
+                      .length
+                  }{' '}
                   complete
                 </span>
                 <span>
-                  {book.chapters.filter((c) => c.status === 'Drafting').length}{' '}
+                  {
+                    regularChapters.filter((c) => c.status === 'Drafting')
+                      .length
+                  }{' '}
                   drafting
                 </span>
               </div>
@@ -1435,7 +1591,31 @@ export default function App() {
                     }}
                   >
                     <div className="outline-card-top">
-                      <span>CHAPTER {String(i + 1).padStart(2, '0')}</span>
+                      <select
+                        className="section-kind-select"
+                        aria-label={'Section type for ' + c.title}
+                        title="Chapter, prologue or epilogue"
+                        value={c.kind}
+                        disabled={readOnly}
+                        onChange={(e) =>
+                          mutate((b) => ({
+                            ...b,
+                            chapters: changeChapterKind(
+                              b.chapters,
+                              c.id,
+                              e.target.value as ChapterKind,
+                            ),
+                          }))
+                        }
+                      >
+                        {chapterKinds.map((kind) => (
+                          <option key={kind} value={kind}>
+                            {kind === 'chapter' && c.kind === 'chapter'
+                              ? chapterLabel(book.chapters, c, true)
+                              : chapterKindNames[kind]}
+                          </option>
+                        ))}
+                      </select>
                       <GripVertical size={16} />
                     </div>
                     <button
@@ -1449,7 +1629,7 @@ export default function App() {
                       aria-label={'Synopsis for ' + c.title}
                       value={c.synopsis}
                       disabled={readOnly}
-                      placeholder="Chapter summary…"
+                      placeholder={chapterKindNames[c.kind] + ' summary…'}
                       onChange={(e) =>
                         patchChapter({ synopsis: e.target.value }, c.id)
                       }
@@ -1479,13 +1659,17 @@ export default function App() {
                         className="text-button"
                         onClick={() => chooseScene(c.scenes[0].id)}
                       >
-                        Open chapter
+                        Open {c.kind}
                       </button>
                       <div>
                         <button
                           className="icon-button"
                           aria-label={'Move ' + c.title + ' up'}
-                          disabled={i === 0 || readOnly}
+                          disabled={
+                            i === 0 ||
+                            book.chapters[i - 1].kind !== c.kind ||
+                            readOnly
+                          }
                           onClick={() => moveChapter(c.id, i - 1)}
                         >
                           <ArrowUp size={15} />
@@ -1493,19 +1677,21 @@ export default function App() {
                         <button
                           className="icon-button"
                           aria-label={'Move ' + c.title + ' down'}
-                          disabled={i === book.chapters.length - 1 || readOnly}
+                          disabled={
+                            i === book.chapters.length - 1 ||
+                            book.chapters[i + 1].kind !== c.kind ||
+                            readOnly
+                          }
                           onClick={() => moveChapter(c.id, i + 1)}
                         >
                           <ArrowDown size={15} />
                         </button>
-                        <button
-                          className="icon-button"
-                          aria-label={'Remove ' + c.title}
-                          disabled={book.chapters.length === 1 || readOnly}
-                          onClick={() => removeChapter(c.id)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <EntryMenu
+                          label={c.title || 'Section'}
+                          disabled={readOnly}
+                          deleteDisabled={book.chapters.length === 1}
+                          onDelete={() => removeChapter(c.id)}
+                        />
                       </div>
                     </div>
                   </article>
@@ -1533,12 +1719,43 @@ export default function App() {
               {character ? (
                 <div className="character-layout">
                   <div className="character-cards">
-                    {book.characters.map((c) => (
+                    {book.characters.map((c, index) => (
                       <button
                         key={c.id}
                         className={`character-card ${character.id === c.id ? 'selected' : ''}`}
                         onClick={() => setCharacterId(c.id)}
+                        draggable={!readOnly}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(
+                            'application/x-writing-studio-character',
+                            c.id,
+                          );
+                          e.dataTransfer.effectAllowed = 'move';
+                          setDragging(c.id);
+                        }}
+                        onDragEnd={() => setDragging('')}
+                        onDragOver={(e) => {
+                          if (
+                            e.dataTransfer.types.includes(
+                              'application/x-writing-studio-character',
+                            )
+                          )
+                            e.preventDefault();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const cid = e.dataTransfer.getData(
+                            'application/x-writing-studio-character',
+                          );
+                          if (cid)
+                            mutate((b) => ({
+                              ...b,
+                              characters: reorder(b.characters, cid, index),
+                            }));
+                          setDragging('');
+                        }}
                       >
+                        <GripVertical size={13} className="list-grip" />
                         <span className="avatar mini">
                           {c.name.slice(0, 1) || '?'}
                         </span>
@@ -1574,7 +1791,7 @@ export default function App() {
             </div>
           )}
           {view === 'notes' && (
-            <div className="view-scroll">
+            <div className="view-scroll" ref={noteScroll}>
               <div className="view-heading">
                 <div>
                   <h1>Notebook</h1>
@@ -1584,6 +1801,7 @@ export default function App() {
                   className="primary-button"
                   disabled={readOnly}
                   onClick={() => makeNote()}
+                  ref={addNoteButton}
                 >
                   <Plus size={16} />
                   New note
@@ -1591,15 +1809,24 @@ export default function App() {
               </div>
               {note ? (
                 <article className="note-editor" key={note.id}>
-                  <input
-                    aria-label="Note title"
-                    className="note-title"
-                    value={note.title}
-                    disabled={readOnly}
-                    onChange={(e) =>
-                      patchNote(note.id, { title: e.target.value })
-                    }
-                  />
+                  <div className="note-title-row">
+                    <input
+                      aria-label="Note title"
+                      ref={noteTitleInput}
+                      className="note-title"
+                      value={note.title}
+                      disabled={readOnly}
+                      onChange={(e) =>
+                        patchNote(note.id, { title: e.target.value })
+                      }
+                    />
+                    <EntryMenu
+                      triggerRef={noteMenuButton}
+                      label={note.title || 'Note'}
+                      disabled={readOnly}
+                      onDelete={() => deleteNote(note.id)}
+                    />
+                  </div>
                   <div className="note-metadata">
                     <label>
                       Attached to
@@ -1622,9 +1849,12 @@ export default function App() {
                               Removed chapter
                             </option>
                           )}
-                        {book.chapters.map((c, i) => (
+                        {book.chapters.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {i + 1}. {c.title}
+                            {chapterListTitle(
+                              c,
+                              chapterNumber(book.chapters, c.id),
+                            )}
                           </option>
                         ))}
                       </select>
@@ -1649,6 +1879,28 @@ export default function App() {
                       </select>
                     </label>
                   </div>
+                  {note.chapterId &&
+                    book.chapters.some((c) => c.id === note.chapterId) && (
+                      <button
+                        className="text-button note-chapter-link"
+                        onClick={() => {
+                          const target = book.chapters.find(
+                            (c) => c.id === note.chapterId,
+                          )!;
+                          setContextNoteId(note.id);
+                          setInspectorTab('scene');
+                          setInspector(true);
+                          chooseChapter(target);
+                        }}
+                      >
+                        Open{' '}
+                        {chapterListTitle(
+                          book.chapters.find((c) => c.id === note.chapterId)!,
+                          chapterNumber(book.chapters, note.chapterId),
+                        )}
+                        <ArrowRight size={13} />
+                      </button>
+                    )}
                   <textarea
                     aria-label="Note content"
                     value={note.body}
@@ -1724,8 +1976,7 @@ export default function App() {
               book={book}
               jump={manuscriptJump}
               onEdit={chooseScene}
-              size={pdfSize}
-              onSize={changePageSize}
+              size={pageSize}
               onPageCounts={(counts, size) =>
                 setLayoutCounts({ chapters: book.chapters, size, counts })
               }
@@ -1766,11 +2017,13 @@ export default function App() {
               {inspectorTab === 'scene' && (
                 <>
                   <div className="inspector-heading">
-                    <span className="eyebrow">CURRENT CHAPTER</span>
+                    <span className="eyebrow">
+                      CURRENT {chapter.kind.toUpperCase()}
+                    </span>
                     <h2>{chapter.title || 'Untitled chapter'}</h2>
                   </div>
                   <label>
-                    Chapter summary
+                    {chapterKindNames[chapter.kind]} summary
                     <textarea
                       rows={4}
                       value={chapter.synopsis}
@@ -1782,32 +2035,35 @@ export default function App() {
                     />
                   </label>
                   <div className="section-caption">
-                    CHAPTER NOTES
+                    {chapterKindNames[chapter.kind].toUpperCase()} NOTES
                     <button
                       className="icon-button"
                       aria-label="Add chapter note"
+                      ref={addNoteButton}
                       disabled={readOnly}
                       onClick={() => makeNote(chapter.id)}
                     >
                       <Plus size={15} />
                     </button>
                   </div>
-                  {chapterNotes.map((n) => (
-                    <button
-                      key={n.id}
-                      className={`linked-note ${contextNote?.id === n.id ? 'active' : ''}`}
-                      onClick={() =>
-                        setContextNoteId(contextNoteId === n.id ? '' : n.id)
-                      }
-                    >
-                      <NotebookPen size={14} />
-                      <span>
-                        {n.title}
-                        <small>{n.status}</small>
-                      </span>
-                      <ChevronRight size={13} />
-                    </button>
-                  ))}
+                  <div className="chapter-note-list">
+                    {chapterNotes.map((n) => (
+                      <button
+                        key={n.id}
+                        className={`linked-note ${contextNote?.id === n.id ? 'active' : ''}`}
+                        onClick={() =>
+                          setContextNoteId(contextNoteId === n.id ? '' : n.id)
+                        }
+                      >
+                        <NotebookPen size={14} />
+                        <span>
+                          {n.title}
+                          <small>{n.status}</small>
+                        </span>
+                        <ChevronRight size={13} />
+                      </button>
+                    ))}
+                  </div>
                   {!chapterNotes.length && (
                     <p className="hint">
                       Attach a note here or from the Notebook.
@@ -1815,6 +2071,24 @@ export default function App() {
                   )}
                   {contextNote && (
                     <div className="context-note">
+                      <div className="context-note-actions">
+                        <button
+                          className="text-button"
+                          onClick={() => {
+                            openNote(contextNote);
+                            setNoteResetKey((n) => n + 1);
+                          }}
+                        >
+                          Open in Notebook
+                          <ArrowRight size={13} />
+                        </button>
+                        <EntryMenu
+                          triggerRef={noteMenuButton}
+                          label={contextNote.title || 'Note'}
+                          disabled={readOnly}
+                          onDelete={() => deleteNote(contextNote.id)}
+                        />
+                      </div>
                       <label>
                         Note title
                         <input
@@ -1859,19 +2133,11 @@ export default function App() {
                           alt={image.name}
                         />
                       ))}
-                      <button
-                        className="text-button"
-                        onClick={() => {
-                          setNoteId(contextNote.id);
-                          setView('notes');
-                        }}
-                      >
-                        Open in Notebook
-                        <ArrowRight size={13} />
-                      </button>
                     </div>
                   )}
-                  <div className="section-caption">IN THIS CHAPTER</div>
+                  <div className="section-caption">
+                    IN THIS {chapter.kind.toUpperCase()}
+                  </div>
                   {book.characters
                     .filter((c) => matchesFor(scene.content, c.id).length)
                     .map((c) => (
@@ -2028,7 +2294,7 @@ export default function App() {
             (
               {
                 newBook: 'New book',
-                newChapter: 'Add a chapter',
+                newChapter: 'Add to outline',
                 export: 'Export project',
                 settings: 'Book details',
                 trash: 'Recently removed',
@@ -2062,13 +2328,38 @@ export default function App() {
                   library.update(b);
                   openProject(b.id);
                 } else if (modal === 'newChapter') {
-                  const c = newChapter(formTitle.trim());
-                  mutate((b) => ({ ...b, chapters: [...b.chapters, c] }));
+                  const c = newChapter(formTitle.trim(), formKind);
+                  mutate((b) => ({
+                    ...b,
+                    chapters: orderChapters([...b.chapters, c]),
+                  }));
                   chooseScene(c.scenes[0].id);
                 }
                 setModal(null);
               }}
             >
+              {modal === 'newChapter' && (
+                <label>
+                  Section type
+                  <select
+                    value={formKind}
+                    onChange={(e) => {
+                      const kind = e.target.value as ChapterKind;
+                      setFormKind(kind);
+                      if (!formTitle.trim() || formTitle === suggestedTitle)
+                        setFormTitle(
+                          kind === 'chapter' ? '' : chapterKindNames[kind],
+                        );
+                    }}
+                  >
+                    {chapterKinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {chapterKindNames[kind]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label>
                 {modal === 'newBook' ? 'Working title' : 'Title'}
                 <input
@@ -2086,20 +2377,22 @@ export default function App() {
                       !formTitle.trim()
                     ) {
                       e.preventDefault();
-                      setFormTitle('Chapter ' + (book.chapters.length + 1));
+                      setFormTitle(suggestedTitle);
                     }
                   }}
                   placeholder={
-                    modal === 'newBook'
-                      ? 'Book title'
-                      : 'Chapter ' + (book.chapters.length + 1)
+                    modal === 'newBook' ? 'Book title' : suggestedTitle
                   }
                 />
               </label>
               {modal === 'newChapter' && (
                 <p className="hint chapter-title-suggestion">
-                  Press <kbd>Tab</kbd> to use “Chapter{' '}
-                  {book.chapters.length + 1}”, or enter your own title.
+                  Press <kbd>Tab</kbd> to use “{suggestedTitle}”, or enter your
+                  own title.
+                  {formKind !== 'chapter' &&
+                    ' This section is unnumbered and sits ' +
+                      (formKind === 'prologue' ? 'before' : 'after') +
+                      ' the chapters.'}
                 </p>
               )}
               {modal === 'newBook' && (
@@ -2126,7 +2419,7 @@ export default function App() {
                   disabled={!formTitle.trim() || readOnly}
                 >
                   <Plus size={16} />
-                  Create {modal === 'newBook' ? 'book' : 'chapter'}
+                  Create {modal === 'newBook' ? 'book' : formKind}
                 </button>
               </div>
             </form>
@@ -2178,12 +2471,12 @@ export default function App() {
           {modal === 'export' && (
             <>
               <p className="modal-intro">
-                Choose chapters for a formatted manuscript, or back up the
+                Choose sections for a formatted manuscript, or back up the
                 complete project with its notes, images, and versions.
               </p>
               <section className="export-selection">
                 <div className="section-caption">
-                  CHAPTERS TO INCLUDE
+                  SECTIONS TO INCLUDE
                   <div>
                     <button
                       className="text-button"
@@ -2204,7 +2497,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="chapter-checkboxes">
-                  {book.chapters.map((c, i) => (
+                  {book.chapters.map((c) => (
                     <label key={c.id}>
                       <input
                         type="checkbox"
@@ -2220,25 +2513,28 @@ export default function App() {
                         }
                       />
                       <span>
-                        {i + 1}. {c.title}
+                        {chapterListTitle(
+                          c,
+                          chapterNumber(book.chapters, c.id),
+                        )}
                       </span>
                       <small>{fmt(chapterWords(c))} words</small>
                     </label>
                   ))}
                 </div>
                 <label>
-                  Book page size
+                  PDF format
                   <select
                     value={pdfSize}
                     onChange={(e) =>
-                      changePageSize(e.target.value as 'compact' | 'large')
+                      setPdfSize(e.target.value as 'compact' | 'large')
                     }
                   >
-                    <option value="compact">
-                      Compact novel · 5.5 × 8.5 inches
-                    </option>
                     <option value="large">
-                      Trade paperback · 6 × 9 inches
+                      Standard · trade paperback · 6 × 9 inches
+                    </option>
+                    <option value="compact">
+                      Alternative · compact novel · 5.5 × 8.5 inches
                     </option>
                   </select>
                 </label>
@@ -2246,7 +2542,8 @@ export default function App() {
                   Crimson Text · 10.5 pt · 14 pt line spacing · justified
                   paragraphs. Includes a title page, blank title-page reverse,
                   chapter openings, and page numbers. Chapters retain their
-                  original numbers. Planning notes are excluded.
+                  original numbers; prologues and epilogues are unnumbered.
+                  Planning notes are excluded.
                 </p>
               </section>
               <div className="export-options">
@@ -2283,7 +2580,9 @@ export default function App() {
                       {pdfBusy ? 'Preparing PDF…' : 'Download book PDF'}
                     </strong>
                     <small>
-                      {selectedChapters.size} chapters · book formatting
+                      {selectedChapters.size}{' '}
+                      {selectedChapters.size === 1 ? 'section' : 'sections'} ·
+                      book formatting
                     </small>
                   </span>
                   <Download size={17} />
@@ -2312,7 +2611,7 @@ export default function App() {
                   onClick={() =>
                     download(
                       fileName(book.title) + '.html',
-                      manuscriptHtml(selectedBook),
+                      manuscriptHtml(selectedBook, book.chapters),
                       'text/html',
                     )
                   }
@@ -2320,7 +2619,7 @@ export default function App() {
                   <BookOpen size={22} />
                   <span>
                     <strong>Export HTML</strong>
-                    <small>Selected chapters with formatting and images</small>
+                    <small>Selected sections with formatting and images</small>
                   </span>
                   <ArrowRight size={17} />
                 </button>
@@ -2329,7 +2628,7 @@ export default function App() {
                   onClick={() =>
                     download(
                       fileName(book.title) + '.txt',
-                      manuscriptText(selectedBook),
+                      manuscriptText(selectedBook, book.chapters),
                       'text/plain',
                     )
                   }
@@ -2337,7 +2636,7 @@ export default function App() {
                   <FileText size={22} />
                   <span>
                     <strong>Export plain text</strong>
-                    <small>Selected chapters in reading order</small>
+                    <small>Selected sections in reading order</small>
                   </span>
                   <ArrowRight size={17} />
                 </button>
@@ -2369,7 +2668,7 @@ export default function App() {
           {modal === 'trash' && (
             <>
               {book.trash.length > 0 && (
-                <div className="section-caption">CHAPTERS</div>
+                <div className="section-caption">SECTIONS</div>
               )}
               {book.trash.map((item) => (
                 <div key={item.chapter.id} className="trash-row">
@@ -2386,12 +2685,12 @@ export default function App() {
                     onClick={() => {
                       mutate((b) => ({
                         ...b,
-                        chapters: [...b.chapters, item.chapter],
+                        chapters: orderChapters([...b.chapters, item.chapter]),
                         trash: b.trash.filter(
                           (t) => t.chapter.id !== item.chapter.id,
                         ),
                       }));
-                      setToast('Chapter restored at the end of your book.');
+                      setToast('Section restored to the outline.');
                     }}
                   >
                     <RotateCcw size={14} />
@@ -2428,11 +2727,39 @@ export default function App() {
                   </button>
                 </div>
               ))}
-              {!book.trash.length && !book.removedCharacters.length && (
-                <p className="modal-intro">
-                  Removed chapters and characters stay here, ready to restore.
-                </p>
+              {book.removedNotes.length > 0 && (
+                <div className="section-caption">NOTES</div>
               )}
+              {book.removedNotes.map((item) => (
+                <div key={item.note.id} className="trash-row">
+                  <div>
+                    <strong>{item.note.title || 'Untitled note'}</strong>
+                    <small>{shortDate(item.deletedAt)} · Note</small>
+                  </div>
+                  <button
+                    className="secondary-button"
+                    aria-label={'Restore note: ' + item.note.title}
+                    disabled={readOnly}
+                    onClick={() => {
+                      mutate((b) => restoreNote(b, item.note.id));
+                      setNoteId(item.note.id);
+                      setNoteResetKey((n) => n + 1);
+                      setToast('Note restored.');
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    Restore
+                  </button>
+                </div>
+              ))}
+              {!book.trash.length &&
+                !book.removedCharacters.length &&
+                !book.removedNotes.length && (
+                  <p className="modal-intro">
+                    Removed sections, characters and notes stay here, ready to
+                    restore.
+                  </p>
+                )}
             </>
           )}
           {modal === 'search' && (
@@ -2536,8 +2863,8 @@ export default function App() {
                       <button
                         key={n.id}
                         onClick={() => {
-                          setNoteId(n.id);
-                          setView('notes');
+                          openNote(n);
+                          setNoteResetKey((n) => n + 1);
                           setModal(null);
                         }}
                       >

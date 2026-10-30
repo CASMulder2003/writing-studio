@@ -938,17 +938,6 @@ strong {
   font-weight: 500;
   overflow-wrap: anywhere;
 }
-.character-delete {
-  flex-shrink: 0;
-  color: #98655f;
-  font-size: 11px;
-  padding: 6px;
-  border-radius: 4px;
-}
-.character-delete:hover {
-  color: #814a43;
-  background: #f8edeb;
-}
 .character-name-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1119,6 +1108,20 @@ strong {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 4px #384e3003;
+}
+.section-kind-select {
+  width: auto;
+  border: 0;
+  background: transparent;
+  padding: 3px 18px 3px 0;
+  color: inherit;
+  font: inherit;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.section-kind-select:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
 }
 .outline-card-top {
   display: flex;

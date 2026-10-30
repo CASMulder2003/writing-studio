@@ -3,6 +3,11 @@
 Writing Studio is a personal workspace for full books and smaller writing projects.
 The main unit of the manuscript is a chapter. A short story or poem can use a single
 chapter without adopting novel-length goals.
+Prologues and epilogues are unnumbered sections placed before and after the
+numbered chapters. Their words and pages contribute to the book totals. The
+outline's section-type selector can convert existing writing without losing its
+content or linked notes. Older projects recognise exact Prologue/Epilogue titles;
+explicit section types always take precedence.
 
 ## Implemented
 
@@ -14,10 +19,18 @@ shared names and aliases remain unlinked.
 Profiles can be deleted from Characters or the writing context panel and restored
 from Recently removed. Removing a profile clears its links without editing the
 manuscript. Removed profiles remain in local storage and complete project backups.
+Characters can be dragged into a preferred order, with keyboard Move up/down actions
+in their options menu. Delete actions for profiles, notes and outline sections live
+in ⋯ menus with keyboard navigation and Escape dismissal.
 
 Notes can stand alone or belong to a chapter; either kind remains visible in the
 Notebook. Notes have planning status and support attached images and simple drawings.
 The manuscript also supports images.
+The notebook groups notes by chapter or Standalone, with collapsible groups, previews,
+content search, and chapter/status filters. Notes can be dragged within a group to
+reorder or onto another group to change their chapter attachment. Keyboard move
+actions are available in note menus. Deleted notes can be recovered intact, including
+images and chapter links, from Recently removed and are retained in project backups.
 
 The project switcher opens the saved-project library and supports creating or closing
 a project. Projects open in Outline. Chapter tabs represent open editors; closing a
@@ -33,6 +46,10 @@ chapter openings, mirrored margins, running headers and page numbers. The editor
 uses book-sized sheets and the same typefaces and spacing, with an optional Continuous
 layout. Its visual page breaks are approximate; PDF-based counts recalculate after
 edits. Page boundaries never alter the manuscript document or its undo history.
+Writing, reading and page counts use the standard 6 × 9 inch trim. The formatting
+toolbar stays pinned during scrolling and contains the Pages/Continuous switch.
+Export defaults to the same layout, with an optional 5.5 × 8.5 inch version; choosing
+the alternative does not change the workspace.
 
 ## Boundaries
 

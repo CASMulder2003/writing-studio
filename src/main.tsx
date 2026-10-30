@@ -4,6 +4,7 @@ import App from './app/App';
 import './styles/index.css';
 import './styles/navigation.css';
 import './styles/book-pages.css';
+import './styles/notes.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('The application root is missing.');

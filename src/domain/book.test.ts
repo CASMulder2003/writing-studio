@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   backup,
+  chapterNumber,
+  chapterLabel,
+  chapterListTitle,
+  chapterOpening,
+  numberedChapters,
+  orderChapters,
+  changeChapterKind,
+  bookWords,
   characterNameParts,
   updateCharacterName,
   docHtml,
@@ -16,6 +24,9 @@ import {
   reorder,
   removeCharacter,
   restoreCharacter,
+  removeNote,
+  restoreNote,
+  moveNote,
   words,
   type Character,
   type DocNode,
@@ -167,6 +178,124 @@ describe('book structure and portable backups', () => {
       expect(output).not.toContain('SECRET PLAN');
       expect(output).not.toContain('PRIVATE NOTE');
     }
+  });
+});
+describe('prologues and epilogues', () => {
+  it('preserves note content, chapter links and attachments through reordering and recoverable deletion', () => {
+    const book = newBook();
+    const first = {
+      id: 'note-a',
+      title: 'Clue',
+      body: 'Keep this clue.',
+      chapterId: book.chapters[0].id,
+      status: 'Planned' as const,
+      updatedAt: 1,
+      images: [
+        {
+          id: 'picture',
+          name: 'Clue image',
+          dataUrl: 'data:image/png;base64,AA==',
+        },
+      ],
+    };
+    const next = {
+      ...first,
+      id: 'note-b',
+      title: 'Question',
+      chapterId: null,
+      images: [],
+    };
+    book.notes = [first, next];
+    const moved = moveNote(book.notes, next.id, first.chapterId, first.id);
+    expect(moved.map((n) => n.id)).toEqual([next.id, first.id]);
+    expect(moved[0].chapterId).toBe(first.chapterId);
+    expect(moved[1]).toBe(first);
+    book.notes = moved;
+    const deleted = removeNote(book, first.id);
+    expect(deleted.notes).toHaveLength(1);
+    expect(deleted.chapters).toBe(book.chapters);
+    const restored = restoreNote(parseBackup(backup(deleted)), first.id);
+    expect(restored.notes.find((n) => n.id === first.id)).toEqual(first);
+    expect(restored.removedNotes).toEqual([]);
+    expect(removeNote(deleted, first.id)).toBe(deleted);
+    expect(restoreNote(restored, first.id)).toBe(restored);
+    expect(
+      parseBackup({
+        ...backup(book),
+        book: { ...book, removedNotes: undefined },
+      }).removedNotes,
+    ).toEqual([]);
+  });
+  it('converts existing writing without losing notes or content, and numbers only chapters', () => {
+    const book = newBook('Book');
+    const first = book.chapters[0];
+    first.title = 'Before';
+    first.scenes[0].content = paragraph('The opening stays intact.');
+    const next = newChapter('Arrival');
+    const last = newChapter('Epilogue', 'epilogue');
+    last.scenes[0].content = paragraph('The ending stays intact.');
+    book.chapters = [first, next, last];
+    const total = bookWords(book);
+    book.chapters = changeChapterKind(book.chapters, first.id, 'prologue');
+    expect(book.chapters[0].scenes).toBe(first.scenes);
+    expect(numberedChapters(book.chapters)).toEqual([next]);
+    expect(
+      book.chapters.map((c) => chapterNumber(book.chapters, c.id)),
+    ).toEqual([null, 1, null]);
+    expect(chapterLabel(book.chapters, book.chapters[0])).toBe('Prologue');
+    expect(chapterListTitle(book.chapters[0], null)).toBe('Prologue: Before');
+    expect(chapterOpening(last, null)).toEqual({
+      label: '',
+      title: 'Epilogue',
+    });
+    expect(bookWords(book)).toBe(total);
+    const added = newChapter('Second');
+    book.chapters = orderChapters([...book.chapters, added]);
+    expect(book.chapters.map((c) => c.id)).toEqual([
+      first.id,
+      next.id,
+      added.id,
+      last.id,
+    ]);
+    const copy = parseBackup(backup(book));
+    expect(copy.chapters.map((c) => c.kind)).toEqual([
+      'prologue',
+      'chapter',
+      'chapter',
+      'epilogue',
+    ]);
+    const selected = { ...book, chapters: [added, last] };
+    expect(manuscriptText(selected, book.chapters)).toContain('2. Second');
+    expect(manuscriptHtml(selected, book.chapters)).toContain(
+      '<h2>Epilogue</h2>',
+    );
+    const convertedBack = changeChapterKind(book.chapters, first.id, 'chapter');
+    expect(chapterNumber(convertedBack, next.id)).toBe(2);
+  });
+  it('recognises exact prologue and epilogue titles in old backups, while respecting explicit choices', () => {
+    const book = newBook();
+    book.chapters = [
+      newChapter(' Prologue '),
+      newChapter('The epilogue problem'),
+      newChapter('EPILOGUE'),
+    ];
+    const old = {
+      ...backup(book),
+      book: {
+        ...book,
+        chapters: book.chapters.map(({ kind: _kind, ...chapter }) => chapter),
+      },
+    };
+    const migrated = normaliseBook(parseBackup(old));
+    expect(migrated.chapters.map((c) => c.kind)).toEqual([
+      'prologue',
+      'chapter',
+      'epilogue',
+    ]);
+    expect(normaliseBook(migrated)).toEqual(migrated);
+    expect(
+      parseBackup(backup(book)).chapters.every((c) => c.kind === 'chapter'),
+    ).toBe(true);
   });
 });
 describe('character references', () => {

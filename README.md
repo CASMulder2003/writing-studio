@@ -7,11 +7,13 @@ Built with React, TypeScript, and Tiptap; runs locally or as a static GitHub Pag
 
 - Switch projects from the project name at the top. Open chapters from Outline into closable tabs; each project remembers its tabs.
 - Write and reorder chapters, add summaries, and track Planned, Drafting, Revising, and Complete status.
+- Add unnumbered prologues and epilogues, or change an existing chapter's type in the outline. Chapter counts exclude these sections; word and page totals include them.
 - See chapter and book word counts and formatted page counts, without targets or reading-time goals.
 - Keep compact character profiles with first, last, optional middle names, and aliases. Click highlighted full names or unique first names to open their profiles.
-- Delete character profiles from Characters or the writing context panel; restore them from Recently removed. Manuscript text stays intact.
-- Write standalone notes or attach them to chapters. Add images, captions, and drawings to the notebook.
-- Write on scrolling book-sized pages, or switch to Continuous layout. Screen zoom does not change the book's formatting.
+- Arrange characters by dragging their names, or use Move up/down in their ⋯ menu.
+- Use ⋯ menus to delete profiles, notes, or outline sections; restore them from Recently removed. Deleting a profile leaves manuscript text intact.
+- Write standalone notes or attach them to chapters. Browse grouped previews, search note content, and filter by chapter or status. Drag notes to reorder them or move them onto another chapter group. Add images, captions, and drawings.
+- Write on scrolling book-sized pages, or switch to Continuous in the formatting toolbar. The toolbar stays visible as you scroll.
 - Use rich text, manuscript images, focus mode, search, and a paginated reading view that shares the PDF layout.
 - Save chapter versions, restore earlier drafts, and recover removed chapters.
 - Export selected chapters as a novel-sized PDF with a title page, chapter openings, and page numbers. HTML and plain-text exports are also available.
@@ -34,9 +36,10 @@ estimate while pagination is pending. Workspace totals count body pages; Read bo
 also includes the title page and its blank reverse. Reading and PDF export share
 the same page layout. Writing uses the same Crimson Text 10.5 pt / 14 pt typography
 and trim size, with continuous editable text flowing across visual sheets. Its
-browser line breaks can differ slightly from the final PDF. The page size is
-remembered per project on this device and applies to writing, reading and PDF export.
-An export includes only the selected chapters and excludes planning notes.
+browser line breaks can differ slightly from the final PDF. Writing, reading and
+page counts use the standard 6 × 9 inch trade paperback size. PDF export defaults
+to that size and offers 5.5 × 8.5 inches as an alternative without changing the
+workspace layout. An export includes only selected sections and excludes planning notes.
 
 ## Run locally
 

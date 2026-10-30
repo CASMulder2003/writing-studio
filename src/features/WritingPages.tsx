@@ -47,7 +47,7 @@ export function WritingPages({
   zoom,
   paged,
   chapterTitle,
-  chapterNumber,
+  chapterLabel,
   onPages,
 }: {
   editor: Editor;
@@ -56,7 +56,7 @@ export function WritingPages({
   zoom: string;
   paged: boolean;
   chapterTitle: string;
-  chapterNumber: number;
+  chapterLabel: string;
   onPages: (pages: number) => void;
 }) {
   const dimensions = bookDimensions(size);
@@ -153,7 +153,7 @@ export function WritingPages({
           </div>
         )}
         <div className="writing-chapter-opening" aria-hidden="true">
-          <span>CHAPTER {chapterNumber}</span>
+          <span>{chapterLabel || '\u00a0'}</span>
           <div ref={heading}>{chapterTitle || 'Untitled chapter'}</div>
         </div>
         <div

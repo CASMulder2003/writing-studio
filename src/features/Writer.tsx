@@ -7,7 +7,6 @@ import Image from '@tiptap/extension-image';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { characterDecorations } from './characterReferences';
 import { WritingPages } from './WritingPages';
-import { PageControls } from './PageControls';
 import type { BookSize } from './bookFormat';
 import {
   Bold,
@@ -32,9 +31,8 @@ export function Writer({
   onCharacter,
   readOnly,
   size,
-  onSize,
   chapterTitle,
-  chapterNumber,
+  chapterLabel,
   onPages,
 }: {
   scene: Scene;
@@ -43,14 +41,12 @@ export function Writer({
   onCharacter: (id: string) => void;
   readOnly: boolean;
   size: BookSize;
-  onSize: (size: BookSize) => void;
   chapterTitle: string;
-  chapterNumber: number;
+  chapterLabel: string;
   onPages: (pages: number) => void;
 }) {
   const imageInput = useRef<HTMLInputElement>(null);
   const [imageError, setImageError] = useState('');
-  const [zoom, setZoom] = useState('fit');
   const [paged, setPaged] = useState(() => {
     try {
       return localStorage.getItem('writing-studio-page-view') !== 'continuous';
@@ -257,8 +253,6 @@ export function Writer({
             if (imageInput.current) imageInput.current.value = '';
           }}
         />
-      </div>
-      <div className="book-view-toolbar writing-view-toolbar">
         <label className="writing-layout-label">
           <span>Layout</span>
           <select
@@ -281,12 +275,6 @@ export function Writer({
             <option value="continuous">Continuous</option>
           </select>
         </label>
-        <PageControls
-          size={size}
-          onSize={onSize}
-          zoom={zoom}
-          onZoom={setZoom}
-        />
       </div>
       {imageError && (
         <p className="inline-error" role="alert">
@@ -296,10 +284,10 @@ export function Writer({
       <WritingPages
         editor={editor}
         size={size}
-        zoom={zoom}
+        zoom="fit"
         paged={paged}
         chapterTitle={chapterTitle}
-        chapterNumber={chapterNumber}
+        chapterLabel={chapterLabel}
         onPages={onPages}
       >
         <EditorContent editor={editor} />

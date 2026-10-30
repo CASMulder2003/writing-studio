@@ -1,9 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { Book } from '../domain/book';
 import type { BookPage, BookPreview } from './bookPdf';
 import { bookDimensions, mmToPx, ptToMm, type BookSize } from './bookFormat';
-import { PageControls } from './PageControls';
 import { usePageScale } from './usePageScale';
 
 function PreviewPage({
@@ -105,36 +104,21 @@ export function Manuscript({
   jump,
   onEdit,
   size,
-  onSize,
   onPageCounts,
 }: {
   book: Book;
   jump: { id: string; request: number };
   onEdit: (sceneId: string) => void;
   size: BookSize;
-  onSize: (size: BookSize) => void;
   onPageCounts: (counts: Record<string, number>, size: BookSize) => void;
 }) {
   const [preview, setPreview] = useState<BookPreview>();
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
-  const [zoom, setZoom] = useState('fit');
   const { width } = bookDimensions(size);
-  const { container, scale } = usePageScale(mmToPx(width), zoom);
+  const { container, scale } = usePageScale(mmToPx(width), 'fit');
   const chapters = useRef(new Map<string, HTMLElement>());
   const scroller = useRef<HTMLDivElement>(null);
-  const zoomPosition = useRef<number | undefined>(undefined);
-  const changeZoom = (value: string) => {
-    if (scroller.current)
-      zoomPosition.current = scroller.current.scrollTop / scale;
-    setZoom(value);
-  };
-  useLayoutEffect(() => {
-    if (scroller.current && zoomPosition.current !== undefined) {
-      scroller.current.scrollTop = zoomPosition.current * scale;
-      zoomPosition.current = undefined;
-    }
-  }, [scale]);
   const onCounts = useRef(onPageCounts);
   onCounts.current = onPageCounts;
   useEffect(() => {
@@ -183,12 +167,7 @@ export function Manuscript({
             ? `${preview.pages.length} pages · including 2 front pages`
             : 'Preparing book…'}
         </span>
-        <PageControls
-          size={size}
-          onSize={onSize}
-          zoom={zoom}
-          onZoom={changeZoom}
-        />
+        <span>6 × 9 in · standard PDF layout</span>
       </div>
       <div
         ref={scroller}
@@ -234,7 +213,7 @@ export function Manuscript({
                           className="text-button"
                           onClick={() => onEdit(chapter.scenes[0].id)}
                         >
-                          Edit chapter <ArrowRight size={13} />
+                          Edit {chapter.kind} <ArrowRight size={13} />
                         </button>
                       </div>
                     )}

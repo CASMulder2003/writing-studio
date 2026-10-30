@@ -87,26 +87,26 @@ describe('chapter navigation without changing the manuscript', () => {
   });
 
   it('supports keyboard switching and a close button that does not reopen the chapter', () => {
-    const chapter = newChapter('Prologue');
+    const chapter = newChapter('Prologue', 'prologue');
     const second = newChapter('Arrival');
     const onOpen = vi.fn(),
       onClose = vi.fn();
     render(
       <ChapterTabs
         chapters={[
-          { chapter, number: 1 },
-          { chapter: second, number: 2 },
+          { chapter, number: null },
+          { chapter: second, number: 1 },
         ]}
         activeId={chapter.id}
         onOpen={onOpen}
         onClose={onClose}
       />,
     );
-    const tab = screen.getByRole('tab', { name: '1. Prologue' });
+    const tab = screen.getByRole('tab', { name: 'Prologue' });
     fireEvent.keyDown(tab, { key: 'ArrowLeft' });
     expect(onOpen).toHaveBeenCalledWith(second);
     expect(document.activeElement).toBe(
-      screen.getByRole('tab', { name: '2. Arrival' }),
+      screen.getByRole('tab', { name: '1. Arrival' }),
     );
     fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
     expect(onOpen).toHaveBeenCalledWith(chapter);

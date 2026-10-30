@@ -5,7 +5,13 @@ import {
   ptToMm,
   type BookSize,
 } from './bookFormat';
-import { type Book, type DocNode, fileName } from '../domain/book';
+import {
+  type Book,
+  type DocNode,
+  fileName,
+  chapterOpening,
+  chapterNumber,
+} from '../domain/book';
 import {
   layoutParagraph,
   justificationGap,
@@ -277,24 +283,20 @@ async function buildBook(
   };
   const openingPages = new Set<number>();
   for (const chapter of selected) {
+    const opening = chapterOpening(
+      chapter,
+      chapterNumber(book.chapters, chapter.id),
+    );
     currentChapter = chapter.id;
     startPage();
     openingPages.add(doc.getNumberOfPages());
     doc.setFont('BookSerif', 'normal');
     doc.setTextColor(105);
     doc.setFontSize(9);
-    text(
-      `CHAPTER ${book.chapters.findIndex((c) => c.id === chapter.id) + 1}`,
-      width / 2,
-      35,
-      { align: 'center' },
-    );
+    if (opening.label) text(opening.label, width / 2, 35, { align: 'center' });
     doc.setTextColor(20);
     doc.setFontSize(18);
-    const titles = doc.splitTextToSize(
-      chapter.title || 'Untitled chapter',
-      textWidth,
-    ) as string[];
+    const titles = doc.splitTextToSize(opening.title, textWidth) as string[];
     y = 46;
     for (const title of titles) {
       text(title, width / 2, y, { align: 'center' });

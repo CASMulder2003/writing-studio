@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Plus, ArrowRight, ChevronLeft } from 'lucide-react';
-import { bookWords, estimatedBookPages, type Book } from '../domain/book';
+import {
+  bookWords,
+  estimatedBookPages,
+  numberedChapters,
+  type Book,
+} from '../domain/book';
 export function ProjectChooser({
   books,
   onOpen,
@@ -112,7 +117,7 @@ export function ProjectChooser({
                   </small>
                 )}
                 <small>
-                  {book.chapters.length} chapters ·{' '}
+                  {numberedChapters(book.chapters).length} chapters ·{' '}
                   {bookWords(book).toLocaleString()} words · ~
                   {estimatedBookPages(book)} pages
                 </small>

@@ -58,13 +58,34 @@ const sceneSchema = z.object({
   notes: z.string(),
   updatedAt: z.number(),
 });
-const chapterSchema = z.object({
-  id: z.string(),
-  title: z.string().max(300),
-  synopsis: z.string(),
-  status: statusSchema,
-  scenes: z.array(sceneSchema).min(1).max(1000),
-});
+export const chapterKinds = ['chapter', 'prologue', 'epilogue'] as const;
+export type ChapterKind = (typeof chapterKinds)[number];
+export const chapterKindNames: Record<ChapterKind, string> = {
+  chapter: 'Chapter',
+  prologue: 'Prologue',
+  epilogue: 'Epilogue',
+};
+const chapterSchema = z
+  .object({
+    id: z.string(),
+    title: z.string().max(300),
+    kind: z.enum(chapterKinds).optional(),
+    synopsis: z.string(),
+    status: statusSchema,
+    scenes: z.array(sceneSchema).min(1).max(1000),
+  })
+  .transform((chapter) => ({
+    ...chapter,
+    // Older projects have no section type. Recognise only these exact names;
+    // an explicitly chosen type always wins, including a numbered chapter.
+    kind:
+      chapter.kind ??
+      ((/^prologue$/i.test(chapter.title.trim())
+        ? 'prologue'
+        : /^epilogue$/i.test(chapter.title.trim())
+          ? 'epilogue'
+          : 'chapter') as ChapterKind),
+  }));
 const characterSchema = z.object({
   id: z.string(),
   name: z.string().max(300),
@@ -114,6 +135,10 @@ export const bookSchema = z.object({
     .max(10000)
     .default([]),
   notes: z.array(noteSchema).max(5000),
+  removedNotes: z
+    .array(z.object({ note: noteSchema, deletedAt: z.number() }))
+    .max(10000)
+    .default([]),
   snapshots: z.array(snapshotSchema).max(10000),
   trash: z
     .array(z.object({ chapter: chapterSchema, deletedAt: z.number() }))
@@ -144,13 +169,84 @@ export const newScene = (title = 'Scene 1'): Scene => ({
   notes: '',
   updatedAt: Date.now(),
 });
-export const newChapter = (title = 'Untitled chapter'): Chapter => ({
+export const newChapter = (
+  title = 'Untitled chapter',
+  kind: ChapterKind = 'chapter',
+): Chapter => ({
   id: id(),
   title,
+  kind,
   synopsis: '',
   status: 'Planned',
   scenes: [newScene()],
 });
+export const numberedChapters = (chapters: Chapter[]) =>
+  chapters.filter((c) => c.kind === 'chapter');
+export function chapterNumber(
+  chapters: Chapter[],
+  chapterId: string,
+): number | null {
+  const index = numberedChapters(chapters).findIndex((c) => c.id === chapterId);
+  return index < 0 ? null : index + 1;
+}
+export function chapterLabel(
+  chapters: Chapter[],
+  chapter: Chapter,
+  padded = false,
+): string {
+  const number = chapterNumber(chapters, chapter.id);
+  return number === null
+    ? chapterKindNames[chapter.kind]
+    : `Chapter ${padded ? String(number).padStart(2, '0') : number}`;
+}
+export function chapterListTitle(
+  chapter: Chapter,
+  number: number | null,
+): string {
+  const title =
+    chapter.title.trim() ||
+    (chapter.kind === 'chapter'
+      ? 'Untitled chapter'
+      : chapterKindNames[chapter.kind]);
+  if (number !== null) return `${number}. ${title}`;
+  const label = chapterKindNames[chapter.kind];
+  return title.toLocaleLowerCase() === label.toLocaleLowerCase()
+    ? label
+    : `${label}: ${title}`;
+}
+export function chapterOpening(chapter: Chapter, number: number | null) {
+  const title =
+    chapter.title.trim() ||
+    (chapter.kind === 'chapter'
+      ? 'Untitled chapter'
+      : chapterKindNames[chapter.kind]);
+  const label =
+    number === null ? chapterKindNames[chapter.kind] : `Chapter ${number}`;
+  return {
+    title,
+    label:
+      number === null && title.toLocaleLowerCase() === label.toLocaleLowerCase()
+        ? ''
+        : label.toUpperCase(),
+  };
+}
+export function orderChapters(chapters: Chapter[]): Chapter[] {
+  const order: Record<ChapterKind, number> = {
+    prologue: 0,
+    chapter: 1,
+    epilogue: 2,
+  };
+  return [...chapters].sort((a, b) => order[a.kind] - order[b.kind]);
+}
+export function changeChapterKind(
+  chapters: Chapter[],
+  chapterId: string,
+  kind: ChapterKind,
+): Chapter[] {
+  return orderChapters(
+    chapters.map((c) => (c.id === chapterId ? { ...c, kind } : c)),
+  );
+}
 export function newBook(title = 'Untitled book', author = ''): Book {
   return {
     id: id(),
@@ -163,6 +259,7 @@ export function newBook(title = 'Untitled book', author = ''): Book {
     characters: [],
     removedCharacters: [],
     notes: [],
+    removedNotes: [],
     snapshots: [],
     trash: [],
   };
@@ -324,6 +421,44 @@ export function removeCharacter(book: Book, characterId: string): Book {
     ],
   };
 }
+export function removeNote(book: Book, noteId: string): Book {
+  const note = book.notes.find((n) => n.id === noteId);
+  if (!note) return book;
+  return {
+    ...book,
+    notes: book.notes.filter((n) => n.id !== noteId),
+    removedNotes: [{ note, deletedAt: Date.now() }, ...book.removedNotes],
+  };
+}
+export function restoreNote(book: Book, noteId: string): Book {
+  const removed = book.removedNotes.find((item) => item.note.id === noteId);
+  if (!removed || book.notes.some((n) => n.id === noteId)) return book;
+  return {
+    ...book,
+    notes: [...book.notes, removed.note],
+    removedNotes: book.removedNotes.filter((item) => item.note.id !== noteId),
+  };
+}
+export function moveNote(
+  notes: Note[],
+  noteId: string,
+  chapterId: string | null,
+  beforeId?: string,
+): Note[] {
+  const note = notes.find((n) => n.id === noteId);
+  if (!note || beforeId === noteId) return notes;
+  const rest = notes.filter((n) => n.id !== noteId);
+  const target = beforeId ? rest.findIndex((n) => n.id === beforeId) : -1;
+  const moved =
+    note.chapterId === chapterId
+      ? note
+      : { ...note, chapterId, updatedAt: Date.now() };
+  return [
+    ...rest.slice(0, target < 0 ? rest.length : target),
+    moved,
+    ...rest.slice(target < 0 ? rest.length : target),
+  ];
+}
 export function restoreCharacter(book: Book, characterId: string): Book {
   const removed = book.removedCharacters.find(
     (item) => item.character.id === characterId,
@@ -382,6 +517,7 @@ export function parseBackup(input: unknown): Book {
     ...parsed.book.characters.map((c) => c.id),
     ...parsed.book.removedCharacters.map((item) => item.character.id),
     ...parsed.book.notes.map((n) => n.id),
+    ...parsed.book.removedNotes.map((item) => item.note.id),
   ];
   if (new Set(ids).size !== ids.length)
     throw new Error('The backup contains duplicate record identifiers.');
@@ -419,19 +555,21 @@ export function normaliseBook(input: Book): Book {
   return {
     ...book,
     notes,
-    chapters: book.chapters.map((chapter) => ({
-      ...chapter,
-      scenes: [
-        {
-          ...chapter.scenes[0],
-          notes: '',
-          content:
-            chapter.scenes.length === 1
-              ? chapter.scenes[0].content
-              : merged(chapter),
-        },
-      ],
-    })),
+    chapters: orderChapters(
+      book.chapters.map((chapter) => ({
+        ...chapter,
+        scenes: [
+          {
+            ...chapter.scenes[0],
+            notes: '',
+            content:
+              chapter.scenes.length === 1
+                ? chapter.scenes[0].content
+                : merged(chapter),
+          },
+        ],
+      })),
+    ),
     snapshots: book.snapshots.map((snapshot) => {
       const parent = book.chapters.find((c) =>
         c.scenes.some((s) => s.id === snapshot.sceneId),
@@ -512,16 +650,16 @@ export function docHtml(node: DocNode): string {
         )[node.type];
   return tag ? `<${tag}>${children}</${tag}>` : children;
 }
-export function manuscriptHtml(book: Book) {
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(book.title)}</title><style>body{max-width:720px;margin:60px auto;font:18px/1.8 Georgia,serif;padding:0 24px}h1,h2{text-align:center}section{break-before:page;margin-top:70px}.scene+ .scene:before{content:'* * *';display:block;text-align:center;margin:32px}p{white-space:pre-wrap}@media print{body{margin:0;max-width:none}section{margin-top:0}}</style><h1>${escapeHtml(book.title)}</h1><p style="text-align:center">${escapeHtml(book.author)}</p>${book.chapters.map((c, i) => `<section><h2>${i + 1}. ${escapeHtml(c.title)}</h2>${c.scenes.map((s) => `<div class="scene">${docHtml(s.content)}</div>`).join('')}</section>`).join('')}</html>`;
+export function manuscriptHtml(book: Book, allChapters = book.chapters) {
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(book.title)}</title><style>body{max-width:720px;margin:60px auto;font:18px/1.8 Georgia,serif;padding:0 24px}h1,h2{text-align:center}section{break-before:page;margin-top:70px}.scene+ .scene:before{content:'* * *';display:block;text-align:center;margin:32px}p{white-space:pre-wrap}@media print{body{margin:0;max-width:none}section{margin-top:0}}</style><h1>${escapeHtml(book.title)}</h1><p style="text-align:center">${escapeHtml(book.author)}</p>${book.chapters.map((c) => `<section><h2>${escapeHtml(chapterListTitle(c, chapterNumber(allChapters, c.id)))}</h2>${c.scenes.map((s) => `<div class="scene">${docHtml(s.content)}</div>`).join('')}</section>`).join('')}</html>`;
 }
-export function manuscriptText(book: Book) {
+export function manuscriptText(book: Book, allChapters = book.chapters) {
   return (
     `${book.title}\n${book.author}\n\n` +
     book.chapters
       .map(
-        (c, i) =>
-          `${i + 1}. ${c.title}\n\n` +
+        (c) =>
+          `${chapterListTitle(c, chapterNumber(allChapters, c.id))}\n\n` +
           c.scenes
             .map((s) => plainText(s.content).trim())
             .join('\n\n* * *\n\n'),

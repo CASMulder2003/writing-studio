@@ -44,13 +44,6 @@
   font-size: 11px;
   color: #727c70;
 }
-.page-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-.page-controls label,
 .writing-layout-label {
   display: flex;
   flex-direction: row;
@@ -58,14 +51,6 @@
   gap: 6px;
   font-size: 11px;
   white-space: nowrap;
-}
-.book-view-toolbar select {
-  border: 1px solid var(--border);
-  background: white;
-  border-radius: 5px;
-  padding: 5px 7px;
-  color: #465548;
-  font-size: 11px;
 }
 .book-reading-scroll {
   padding: 30px 24px;
@@ -128,17 +113,34 @@
   box-shadow: none;
 }
 .paper .editor-toolbar {
+  position: sticky;
+  top: -20px;
+  z-index: 20;
+  box-shadow: 0 3px 8px #2838200a;
   background: #fafbf7;
   border: 1px solid var(--border);
-  border-radius: 6px 6px 0 0;
+  border-radius: 6px;
   padding: 7px 12px;
   min-height: 40px;
 }
-.writing-view-toolbar {
+.editor-toolbar .writing-layout-label {
+  margin-left: auto;
+  margin-bottom: 0;
+  padding-left: 10px;
+}
+.editor-toolbar .writing-layout-label > span {
+  display: none;
+}
+.editor-toolbar .writing-layout-label select {
   border: 1px solid var(--border);
-  border-top: 0;
-  border-radius: 0 0 6px 6px;
-  padding: 8px 12px;
+  border-radius: 4px;
+  background: #fff;
+  padding: 5px 22px 5px 8px;
+  color: #53694b;
+  font-size: 11px;
+}
+.book-writing-flow .manuscript-editor {
+  scroll-margin-top: 60px;
 }
 .writing-page-viewport {
   margin-top: 22px;
@@ -290,8 +292,5 @@
   }
   .book-view-toolbar > span {
     font-size: 10px;
-  }
-  .page-controls {
-    gap: 10px;
   }
 }
