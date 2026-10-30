@@ -1714,16 +1714,6 @@ export default function App() {
                   icon={NotebookPen}
                   title="No notes yet"
                   body="Add a note for the project, or attach it to a chapter."
-                  action={
-                    <button
-                      className="secondary-button"
-                      disabled={readOnly}
-                      onClick={() => makeNote()}
-                    >
-                      <Plus size={16} />
-                      Write a note
-                    </button>
-                  }
                 />
               )}
             </div>
