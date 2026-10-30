@@ -11,6 +11,9 @@ editor, character cards, and a notebook. Character names and aliases link to the
 profiles without modifying manuscript text. Character names have first, last, and
 optional middle-name fields. Unique first names also link automatically; ambiguous
 shared names and aliases remain unlinked.
+Profiles can be deleted from Characters or the writing context panel and restored
+from Recently removed. Removing a profile clears its links without editing the
+manuscript. Removed profiles remain in local storage and complete project backups.
 
 Notes can stand alone or belong to a chapter; either kind remains visible in the
 Notebook. Notes have planning status and support attached images and simple drawings.

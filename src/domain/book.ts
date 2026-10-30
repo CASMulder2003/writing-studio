@@ -109,6 +109,10 @@ export const bookSchema = z.object({
   updatedAt: z.number(),
   chapters: z.array(chapterSchema).min(1).max(1000),
   characters: z.array(characterSchema).max(2000),
+  removedCharacters: z
+    .array(z.object({ character: characterSchema, deletedAt: z.number() }))
+    .max(10000)
+    .default([]),
   notes: z.array(noteSchema).max(5000),
   snapshots: z.array(snapshotSchema).max(10000),
   trash: z
@@ -157,6 +161,7 @@ export function newBook(title = 'Untitled book', author = ''): Book {
     updatedAt: Date.now(),
     chapters: [newChapter('Chapter one')],
     characters: [],
+    removedCharacters: [],
     notes: [],
     snapshots: [],
     trash: [],
@@ -307,6 +312,32 @@ export function backup(book: Book) {
     book,
   };
 }
+export function removeCharacter(book: Book, characterId: string): Book {
+  const character = book.characters.find((c) => c.id === characterId);
+  if (!character) return book;
+  return {
+    ...book,
+    characters: book.characters.filter((c) => c.id !== characterId),
+    removedCharacters: [
+      { character, deletedAt: Date.now() },
+      ...book.removedCharacters,
+    ],
+  };
+}
+export function restoreCharacter(book: Book, characterId: string): Book {
+  const removed = book.removedCharacters.find(
+    (item) => item.character.id === characterId,
+  );
+  if (!removed || book.characters.some((c) => c.id === characterId))
+    return book;
+  return {
+    ...book,
+    characters: [...book.characters, removed.character],
+    removedCharacters: book.removedCharacters.filter(
+      (item) => item.character.id !== characterId,
+    ),
+  };
+}
 export function parseBackup(input: unknown): Book {
   const checkDepth = (value: unknown, depth = 0): void => {
     if (depth > 50) throw new Error('This file is too deeply nested.');
@@ -349,6 +380,7 @@ export function parseBackup(input: unknown): Book {
     ...parsed.book.chapters.map((c) => c.id),
     ...parsed.book.chapters.flatMap((c) => c.scenes.map((s) => s.id)),
     ...parsed.book.characters.map((c) => c.id),
+    ...parsed.book.removedCharacters.map((item) => item.character.id),
     ...parsed.book.notes.map((n) => n.id),
   ];
   if (new Set(ids).size !== ids.length)

@@ -9,6 +9,7 @@ Built with React, TypeScript, and Tiptap; runs locally or as a static GitHub Pag
 - Write and reorder chapters, add summaries, and track Planned, Drafting, Revising, and Complete status.
 - See chapter and book word counts and formatted page counts, without targets or reading-time goals.
 - Keep compact character profiles with first, last, optional middle names, and aliases. Click highlighted full names or unique first names to open their profiles.
+- Delete character profiles from Characters or the writing context panel; restore them from Recently removed. Manuscript text stays intact.
 - Write standalone notes or attach them to chapters. Add images, captions, and drawings to the notebook.
 - Write on scrolling book-sized pages, or switch to Continuous layout. Screen zoom does not change the book's formatting.
 - Use rich text, manuscript images, focus mode, search, and a paginated reading view that shares the PDF layout.

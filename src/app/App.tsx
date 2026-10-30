@@ -52,6 +52,8 @@ import {
   parseBackup,
   plainText,
   reorder,
+  removeCharacter,
+  restoreCharacter,
   statuses,
   words,
   type Book,
@@ -212,6 +214,8 @@ export default function App() {
     'scene' | 'character' | 'history'
   >('scene');
   const [characterId, setCharacterId] = useState('');
+  const characterDeleteButton = useRef<HTMLButtonElement>(null);
+  const addCharacterButton = useRef<HTMLButtonElement>(null);
   const [noteId, setNoteId] = useState('');
   const [focus, setFocus] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
@@ -741,6 +745,35 @@ export default function App() {
           {character.name.slice(0, 1).toUpperCase() || '?'}
         </span>
         <strong>{character.name || 'New character'}</strong>
+        <button
+          ref={characterDeleteButton}
+          className="text-button character-delete"
+          aria-label="Delete character"
+          title="Move this character to Recently removed"
+          disabled={readOnly}
+          onClick={() => {
+            if (readOnly) return;
+            const index = book.characters.findIndex(
+              (c) => c.id === character.id,
+            );
+            mutate((b) => removeCharacter(b, character.id));
+            const remaining = bookRef.current?.characters || [];
+            setCharacterId(
+              remaining[Math.min(index, remaining.length - 1)]?.id || '',
+            );
+            setToast(
+              'Character moved to Recently removed. Manuscript text is unchanged.',
+            );
+            requestAnimationFrame(() =>
+              (
+                characterDeleteButton.current || addCharacterButton.current
+              )?.focus({ preventScroll: true }),
+            );
+          }}
+        >
+          <Trash2 size={14} />
+          Delete
+        </button>
       </div>
       <div className="character-name-fields">
         <label>
@@ -1488,6 +1521,7 @@ export default function App() {
                   <p>Character profiles, aliases, and manuscript references.</p>
                 </div>
                 <button
+                  ref={addCharacterButton}
                   className="primary-button"
                   disabled={readOnly}
                   onClick={makeCharacter}
@@ -1901,6 +1935,7 @@ export default function App() {
                         className="secondary-button"
                         disabled={readOnly}
                         onClick={makeCharacter}
+                        ref={addCharacterButton}
                       >
                         <Plus size={14} />
                         Add character
@@ -2343,39 +2378,69 @@ export default function App() {
           )}
           {modal === 'trash' && (
             <>
-              {book.trash.length ? (
-                book.trash.map((item) => (
-                  <div key={item.chapter.id} className="trash-row">
-                    <div>
-                      <strong>{item.chapter.title}</strong>
-                      <small>
-                        {shortDate(item.deletedAt)} ·{' '}
-                        {fmt(chapterWords(item.chapter))} words
-                      </small>
-                    </div>
-                    <button
-                      className="secondary-button"
-                      disabled={readOnly}
-                      onClick={() => {
-                        mutate((b) => ({
-                          ...b,
-                          chapters: [...b.chapters, item.chapter],
-                          trash: b.trash.filter(
-                            (t) => t.chapter.id !== item.chapter.id,
-                          ),
-                        }));
-                        setToast('Chapter restored at the end of your book.');
-                      }}
-                    >
-                      <RotateCcw size={14} />
-                      Restore
-                    </button>
+              {book.trash.length > 0 && (
+                <div className="section-caption">CHAPTERS</div>
+              )}
+              {book.trash.map((item) => (
+                <div key={item.chapter.id} className="trash-row">
+                  <div>
+                    <strong>{item.chapter.title}</strong>
+                    <small>
+                      {shortDate(item.deletedAt)} ·{' '}
+                      {fmt(chapterWords(item.chapter))} words
+                    </small>
                   </div>
-                ))
-              ) : (
+                  <button
+                    className="secondary-button"
+                    disabled={readOnly}
+                    onClick={() => {
+                      mutate((b) => ({
+                        ...b,
+                        chapters: [...b.chapters, item.chapter],
+                        trash: b.trash.filter(
+                          (t) => t.chapter.id !== item.chapter.id,
+                        ),
+                      }));
+                      setToast('Chapter restored at the end of your book.');
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    Restore
+                  </button>
+                </div>
+              ))}
+              {book.removedCharacters.length > 0 && (
+                <div className="section-caption">CHARACTERS</div>
+              )}
+              {book.removedCharacters.map((item) => (
+                <div key={item.character.id} className="trash-row">
+                  <div>
+                    <strong>
+                      {item.character.name || 'Unnamed character'}
+                    </strong>
+                    <small>
+                      {shortDate(item.deletedAt)} · Character
+                      {item.character.role ? ` · ${item.character.role}` : ''}
+                    </small>
+                  </div>
+                  <button
+                    className="secondary-button"
+                    disabled={readOnly}
+                    aria-label={`Restore character: ${item.character.name || 'Unnamed character'}`}
+                    onClick={() => {
+                      mutate((b) => restoreCharacter(b, item.character.id));
+                      setCharacterId(item.character.id);
+                      setToast('Character restored.');
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    Restore
+                  </button>
+                </div>
+              ))}
+              {!book.trash.length && !book.removedCharacters.length && (
                 <p className="modal-intro">
-                  Removed chapters will stay here, ready to restore with their
-                  writing and notes.
+                  Removed chapters and characters stay here, ready to restore.
                 </p>
               )}
             </>

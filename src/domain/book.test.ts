@@ -14,6 +14,8 @@ import {
   normaliseBook,
   parseBackup,
   reorder,
+  removeCharacter,
+  restoreCharacter,
   words,
   type Character,
   type DocNode,
@@ -168,6 +170,64 @@ describe('book structure and portable backups', () => {
   });
 });
 describe('character references', () => {
+  it('removes a profile and its links without changing manuscript text, then restores it from a backup', () => {
+    const book = newBook('Character removal');
+    const anna = {
+      ...character('Anna Stone', ['Annie']),
+      notes: 'Her private working notes.',
+      description: 'A complete profile.',
+      role: 'Protagonist',
+    };
+    book.characters = [anna, character('Mara Vale')];
+    book.chapters[0].scenes[0].content = paragraph(
+      'Anna Stone met Mara. Annie waited.',
+    );
+    const originalText = manuscriptText(book);
+    const removed = removeCharacter(book, anna.id);
+    expect(removed.characters.map((c) => c.name)).toEqual(['Mara Vale']);
+    expect(removed.removedCharacters[0].character).toEqual(anna);
+    expect(removed.chapters).toBe(book.chapters);
+    expect(removed.notes).toBe(book.notes);
+    expect(removed.snapshots).toBe(book.snapshots);
+    expect(manuscriptText(removed)).toBe(originalText);
+    expect(
+      mentions(originalText, removed.characters).map((m) => m.name),
+    ).toEqual(['Mara']);
+    expect(book.characters).toHaveLength(2);
+    expect(removeCharacter(removed, anna.id)).toBe(removed);
+    const copied = importCopy(
+      parseBackup(JSON.parse(JSON.stringify(backup(removed)))),
+    );
+    const restored = restoreCharacter(copied, anna.id);
+    expect(restored.characters.find((c) => c.id === anna.id)).toEqual(anna);
+    expect(restored.removedCharacters).toEqual([]);
+    expect(manuscriptText(restored)).toContain(
+      'Anna Stone met Mara. Annie waited.',
+    );
+    expect(
+      mentions(originalText, restored.characters).map((m) => m.name),
+    ).toEqual(['Anna Stone', 'Mara', 'Annie']);
+    expect(restoreCharacter(restored, anna.id)).toBe(restored);
+  });
+  it('opens earlier backups without a removed-character list and can remove the last profile', () => {
+    const old = backup(newBook());
+    const migrated = parseBackup({
+      ...old,
+      book: { ...old.book, removedCharacters: undefined },
+    });
+    expect(migrated.removedCharacters).toEqual([]);
+    migrated.characters = [character('Anna')];
+    const removed = removeCharacter(migrated, 'Anna');
+    expect(removed.characters).toEqual([]);
+    expect(parseBackup(backup(removed)).removedCharacters).toHaveLength(1);
+    expect(restoreCharacter(newBook(), 'Anna').characters).toEqual([]);
+  });
+  it('rejects a backup with the same character active and removed', () => {
+    const book = newBook();
+    book.characters = [character('Anna')];
+    book.removedCharacters = [{ character: book.characters[0], deletedAt: 1 }];
+    expect(() => parseBackup(backup(book))).toThrow(/duplicate/);
+  });
   it('recognises a unique first name automatically, without matching parts of other words', () => {
     const matches = mentions('Anna Stone met Anna. Annabelle watched.', [
       character('Anna Stone'),

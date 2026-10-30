@@ -932,9 +932,22 @@ strong {
   margin-bottom: 18px;
 }
 .character-identity strong {
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
   font-weight: 500;
   overflow-wrap: anywhere;
+}
+.character-delete {
+  flex-shrink: 0;
+  color: #98655f;
+  font-size: 11px;
+  padding: 6px;
+  border-radius: 4px;
+}
+.character-delete:hover {
+  color: #814a43;
+  background: #f8edeb;
 }
 .character-name-fields {
   display: grid;
