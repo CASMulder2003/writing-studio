@@ -7,11 +7,11 @@ Built with React, TypeScript, and Tiptap; runs locally or as a static GitHub Pag
 
 - Switch projects from the project name at the top. Open chapters from Outline into closable tabs; each project remembers its tabs.
 - Write and reorder chapters, add summaries, and track Planned, Drafting, Revising, and Complete status.
-- Add unnumbered prologues and epilogues, or change an existing chapter's type in the outline. Chapter counts exclude these sections; word and page totals include them.
+- Click Add section for a chapter; right-click it (or press Shift+F10) for an unnumbered prologue or epilogue. Change an existing section's type through its right-click or ⋯ menu. Chapter counts exclude these sections; word and page totals include them.
 - See chapter and book word counts and formatted page counts, without targets or reading-time goals.
 - Keep compact character profiles with first, last, optional middle names, and aliases. Click highlighted full names or unique first names to open their profiles.
 - Arrange characters by dragging their names, or use Move up/down in their ⋯ menu.
-- Use ⋯ menus to delete profiles, notes, or outline sections; restore them from Recently removed. Deleting a profile leaves manuscript text intact.
+- Right-click character names, notes, or outline sections for their actions, or use their ⋯ menus. Delete entries and restore them from Recently removed. Deleting a profile leaves manuscript text intact. Text fields retain their usual browser context menus.
 - Write standalone notes or attach them to chapters. Browse grouped previews, search note content, and filter by chapter or status. Drag notes to reorder them or move them onto another chapter group. Add images, captions, and drawings.
 - Write on scrolling book-sized pages, or switch to Continuous in the formatting toolbar. The toolbar stays visible as you scroll.
 - Use rich text, manuscript images, focus mode, search, and a paginated reading view that shares the PDF layout.

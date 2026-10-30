@@ -6,6 +6,60 @@ import { NotebookIndex } from './NotebookIndex';
 import { newBook, newChapter, type Note } from '../domain/book';
 afterEach(cleanup);
 describe('workspace menus and notebook navigation', () => {
+  it('opens the clicked entry at the pointer without opening or deleting it, and preserves text-field context menus', () => {
+    const remove = vi.fn();
+    render(
+      <article className="test-entry">
+        <button>Chapter title</button>
+        <textarea aria-label="Summary" />
+        <EntryMenu
+          label="Chapter"
+          contextSelector=".test-entry"
+          onDelete={remove}
+        />
+      </article>,
+    );
+    const title = screen.getByRole('button', { name: 'Chapter title' });
+    expect(fireEvent.contextMenu(title, { clientX: 120, clientY: 180 })).toBe(
+      false,
+    );
+    const menu = screen.getByRole('menu');
+    expect(menu.style.left).toBe('120px');
+    expect(menu.style.top).toBe('180px');
+    expect(remove).not.toHaveBeenCalled();
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    expect(document.activeElement).toBe(title);
+    expect(
+      fireEvent.contextMenu(screen.getByRole('textbox', { name: 'Summary' })),
+    ).toBe(true);
+    expect(screen.queryByRole('menu')).toBeNull();
+    fireEvent.contextMenu(title);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(remove).toHaveBeenCalledOnce();
+  });
+  it('opens alternative add actions with Shift+F10 without triggering the parent button', () => {
+    const addChapter = vi.fn(),
+      addPrologue = vi.fn();
+    render(
+      <button className="test-add" onClick={addChapter}>
+        Add section
+        <EntryMenu
+          label="Add section"
+          contextOnly
+          contextSelector=".test-add"
+          actions={[{ label: 'Add prologue', onSelect: addPrologue }]}
+        />
+      </button>,
+    );
+    const add = screen.getByRole('button', { name: 'Add section' });
+    fireEvent.keyDown(add, { key: 'F10', shiftKey: true });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Add prologue' }));
+    expect(addPrologue).toHaveBeenCalledOnce();
+    expect(addChapter).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(add);
+    fireEvent.click(add);
+    expect(addChapter).toHaveBeenCalledOnce();
+  });
   it('opens by keyboard, restores focus on Escape and only deletes after choosing the menu item', () => {
     const remove = vi.fn();
     render(<EntryMenu label="Mara" onDelete={remove} onUp={() => {}} />);

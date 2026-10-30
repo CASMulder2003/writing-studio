@@ -1109,20 +1109,6 @@ strong {
   overflow: hidden;
   box-shadow: 0 2px 4px #384e3003;
 }
-.section-kind-select {
-  width: auto;
-  border: 0;
-  background: transparent;
-  padding: 3px 18px 3px 0;
-  color: inherit;
-  font: inherit;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-.section-kind-select:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 3px;
-}
 .outline-card-top {
   display: flex;
   justify-content: space-between;

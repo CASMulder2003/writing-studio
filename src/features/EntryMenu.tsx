@@ -4,10 +4,17 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useCallback,
   type Ref,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { Ellipsis, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+
+export type MenuAction = {
+  label: string;
+  onSelect: () => void;
+  disabled?: boolean;
+};
 
 export function EntryMenu({
   label,
@@ -17,38 +24,110 @@ export function EntryMenu({
   onUp,
   onDown,
   triggerRef,
+  contextSelector,
+  contextOnly = false,
+  actions = [],
 }: {
   label: string;
-  onDelete: () => void;
+  onDelete?: () => void;
   disabled?: boolean;
   deleteDisabled?: boolean;
   onUp?: () => void;
   onDown?: () => void;
   triggerRef?: Ref<HTMLButtonElement>;
+  contextSelector?: string;
+  contextOnly?: boolean;
+  actions?: MenuAction[];
 }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
+  const contextAnchor = useRef<HTMLSpanElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const current = useRef({ disabled, count: 0 });
+  current.current = {
+    disabled,
+    count:
+      actions.length +
+      Number(Boolean(onDelete)) +
+      Number(Boolean(onUp)) +
+      Number(Boolean(onDown)),
+  };
   const [position, setPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
   const close = (focus = true) => {
     setPosition(null);
-    if (focus) trigger.current?.focus({ preventScroll: true });
+    if (focus)
+      (returnFocus.current || trigger.current)?.focus({ preventScroll: true });
   };
-  const show = () => {
-    const rect = trigger.current?.getBoundingClientRect();
-    if (!rect || disabled) return;
-    const height = 44 + (onUp ? 36 : 0) + (onDown ? 36 : 0);
-    setPosition({
-      left: Math.max(8, Math.min(rect.right - 180, window.innerWidth - 188)),
-      top:
-        rect.bottom + height + 8 > window.innerHeight
-          ? Math.max(8, rect.top - height - 4)
-          : rect.bottom + 4,
-    });
-  };
+  const show = useCallback(
+    (point?: { x: number; y: number; target: HTMLElement }) => {
+      const rect = (point?.target || trigger.current)?.getBoundingClientRect();
+      if (!rect || current.current.disabled) return;
+      returnFocus.current = point?.target || trigger.current;
+      const height = 10 + current.current.count * 36;
+      const x = point ? point.x : rect.right - 180;
+      const y = point ? point.y : rect.bottom + 4;
+      setPosition({
+        left: Math.max(8, Math.min(x, window.innerWidth - 188)),
+        top: Math.max(8, Math.min(y, window.innerHeight - height - 8)),
+      });
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!contextSelector || disabled) return;
+    const target = (
+      contextAnchor.current || trigger.current
+    )?.closest<HTMLElement>(contextSelector);
+    if (!target) return;
+    const editable = (node: EventTarget | null) =>
+      node instanceof Element &&
+      Boolean(
+        node.closest('input, textarea, select, [contenteditable="true"]'),
+      );
+    const focusTarget = (node: EventTarget | null) =>
+      (node instanceof Element
+        ? node.closest<HTMLElement>('button, [tabindex]')
+        : null) ||
+      trigger.current ||
+      target;
+    const context = (event: MouseEvent) => {
+      if (editable(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const source = focusTarget(event.target);
+      const rect = source.getBoundingClientRect();
+      show({
+        x: event.clientX || rect.left,
+        y: event.clientY || rect.bottom,
+        target: source,
+      });
+    };
+    const keyboard = (event: KeyboardEvent) => {
+      if (
+        editable(event.target) ||
+        !(
+          event.key === 'ContextMenu' ||
+          (event.key === 'F10' && event.shiftKey)
+        )
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      const source = focusTarget(event.target);
+      const rect = source.getBoundingClientRect();
+      show({ x: rect.left, y: rect.bottom, target: source });
+    };
+    target.addEventListener('contextmenu', context);
+    target.addEventListener('keydown', keyboard);
+    return () => {
+      target.removeEventListener('contextmenu', context);
+      target.removeEventListener('keydown', keyboard);
+    };
+  }, [contextSelector, contextOnly, disabled, show]);
   useLayoutEffect(() => {
     if (position)
       (
@@ -87,30 +166,34 @@ export function EntryMenu({
   }, [position]);
   return (
     <>
-      <button
-        type="button"
-        className="icon-button entry-menu-trigger"
-        aria-label={label + ' options'}
-        title={label + ' options'}
-        aria-haspopup="menu"
-        aria-expanded={Boolean(position)}
-        aria-controls={position ? id : undefined}
-        disabled={disabled}
-        ref={(node) => {
-          trigger.current = node;
-          if (typeof triggerRef === 'function') triggerRef(node);
-          else if (triggerRef) triggerRef.current = node;
-        }}
-        onClick={() => (position ? close() : show())}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            show();
-          }
-        }}
-      >
-        <Ellipsis size={17} />
-      </button>
+      {contextOnly ? (
+        <span ref={contextAnchor} hidden />
+      ) : (
+        <button
+          type="button"
+          className="icon-button entry-menu-trigger"
+          aria-label={label + ' options'}
+          title={label + ' options'}
+          aria-haspopup="menu"
+          aria-expanded={Boolean(position)}
+          aria-controls={position ? id : undefined}
+          disabled={disabled}
+          ref={(node) => {
+            trigger.current = node;
+            if (typeof triggerRef === 'function') triggerRef(node);
+            else if (triggerRef) triggerRef.current = node;
+          }}
+          onClick={() => (position ? close() : show())}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              show();
+            }
+          }}
+        >
+          <Ellipsis size={17} />
+        </button>
+      )}
       {position &&
         createPortal(
           <div
@@ -122,6 +205,11 @@ export function EntryMenu({
             aria-label={label + ' actions'}
             data-entry-menu="true"
             style={position}
+            onClick={(event) => event.stopPropagation()}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Escape') {
                 event.preventDefault();
@@ -180,18 +268,33 @@ export function EntryMenu({
                 Move down
               </button>
             )}
-            <button
-              role="menuitem"
-              className="menu-delete"
-              disabled={deleteDisabled}
-              onClick={() => {
-                close();
-                onDelete();
-              }}
-            >
-              <Trash2 size={14} />
-              Delete
-            </button>
+            {actions.map((action) => (
+              <button
+                key={action.label}
+                role="menuitem"
+                disabled={action.disabled}
+                onClick={() => {
+                  close();
+                  action.onSelect();
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
+            {onDelete && (
+              <button
+                role="menuitem"
+                className="menu-delete"
+                disabled={deleteDisabled}
+                onClick={() => {
+                  close();
+                  onDelete();
+                }}
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            )}
           </div>,
           document.body,
         )}

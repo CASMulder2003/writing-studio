@@ -5,7 +5,7 @@ The main unit of the manuscript is a chapter. A short story or poem can use a si
 chapter without adopting novel-length goals.
 Prologues and epilogues are unnumbered sections placed before and after the
 numbered chapters. Their words and pages contribute to the book totals. The
-outline's section-type selector can convert existing writing without losing its
+outline's right-click or ⋯ menu can convert existing writing without losing its
 content or linked notes. Older projects recognise exact Prologue/Epilogue titles;
 explicit section types always take precedence.
 
@@ -21,7 +21,9 @@ from Recently removed. Removing a profile clears its links without editing the
 manuscript. Removed profiles remain in local storage and complete project backups.
 Characters can be dragged into a preferred order, with keyboard Move up/down actions
 in their options menu. Delete actions for profiles, notes and outline sections live
-in ⋯ menus with keyboard navigation and Escape dismissal.
+in right-click and ⋯ menus with keyboard navigation and Escape dismissal. Add section
+opens a chapter form on left-click; right-click or Shift+F10 offers Prologue and Epilogue.
+Editable text fields preserve the browser's spelling, copy and paste context menus.
 
 Notes can stand alone or belong to a chapter; either kind remains visible in the
 Notebook. Notes have planning status and support attached images and simple drawings.

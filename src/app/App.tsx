@@ -799,6 +799,82 @@ export default function App() {
         ),
       }));
   };
+  const characterMenu = (target: Character) => {
+    const index = book.characters.indexOf(target);
+    const move = (to: number) =>
+      mutate((b) => ({
+        ...b,
+        characters: reorder(b.characters, target.id, to),
+      }));
+    return {
+      label: target.name || 'Character',
+      disabled: readOnly,
+      onUp: index > 0 ? () => move(index - 1) : undefined,
+      onDown:
+        index < book.characters.length - 1 ? () => move(index + 1) : undefined,
+      onDelete: () => {
+        if (readOnly) return;
+        mutate((b) => removeCharacter(b, target.id));
+        if (character?.id === target.id) {
+          const remaining = bookRef.current?.characters || [];
+          setCharacterId(
+            remaining[Math.min(index, remaining.length - 1)]?.id || '',
+          );
+        }
+        setToast(
+          'Character moved to Recently removed. Manuscript text is unchanged.',
+        );
+        requestAnimationFrame(() =>
+          (characterDeleteButton.current || addCharacterButton.current)?.focus({
+            preventScroll: true,
+          }),
+        );
+      },
+    };
+  };
+  const sectionMenu = (target: Chapter) => {
+    const index = book.chapters.indexOf(target);
+    return {
+      label: target.title || 'Section',
+      disabled: readOnly,
+      deleteDisabled: book.chapters.length === 1,
+      onDelete: () => removeChapter(target.id),
+      onUp:
+        book.chapters[index - 1]?.kind === target.kind
+          ? () => moveChapter(target.id, index - 1)
+          : undefined,
+      onDown:
+        book.chapters[index + 1]?.kind === target.kind
+          ? () => moveChapter(target.id, index + 1)
+          : undefined,
+      actions: chapterKinds
+        .filter((kind) => kind !== target.kind)
+        .map((kind) => ({
+          label: `Make ${kind === 'epilogue' ? 'an' : 'a'} ${kind}`,
+          onSelect: () =>
+            mutate((b) => ({
+              ...b,
+              chapters: changeChapterKind(b.chapters, target.id, kind),
+            })),
+        })),
+    };
+  };
+  const addSectionMenu = () => (
+    <EntryMenu
+      label="Add section"
+      disabled={readOnly}
+      contextOnly
+      contextSelector=".add-section-control"
+      actions={(['prologue', 'epilogue'] as const).map((kind) => ({
+        label: 'Add ' + kind,
+        onSelect: () => {
+          open('newChapter');
+          setFormKind(kind);
+          setFormTitle(chapterKindNames[kind]);
+        },
+      }))}
+    />
+  );
   const characterFields = character ? (
     <div className="character-fields" key={character.id}>
       <div className="character-identity">
@@ -807,54 +883,9 @@ export default function App() {
         </span>
         <strong>{character.name || 'New character'}</strong>
         <EntryMenu
+          {...characterMenu(character)}
+          contextSelector=".character-fields"
           triggerRef={characterDeleteButton}
-          label={character.name || 'Character'}
-          disabled={readOnly}
-          onUp={
-            book.characters.indexOf(character) > 0
-              ? () =>
-                  mutate((b) => ({
-                    ...b,
-                    characters: reorder(
-                      b.characters,
-                      character.id,
-                      b.characters.findIndex((c) => c.id === character.id) - 1,
-                    ),
-                  }))
-              : undefined
-          }
-          onDown={
-            book.characters.indexOf(character) < book.characters.length - 1
-              ? () =>
-                  mutate((b) => ({
-                    ...b,
-                    characters: reorder(
-                      b.characters,
-                      character.id,
-                      b.characters.findIndex((c) => c.id === character.id) + 1,
-                    ),
-                  }))
-              : undefined
-          }
-          onDelete={() => {
-            if (readOnly) return;
-            const index = book.characters.findIndex(
-              (c) => c.id === character.id,
-            );
-            mutate((b) => removeCharacter(b, character.id));
-            const remaining = bookRef.current?.characters || [];
-            setCharacterId(
-              remaining[Math.min(index, remaining.length - 1)]?.id || '',
-            );
-            setToast(
-              'Character moved to Recently removed. Manuscript text is unchanged.',
-            );
-            requestAnimationFrame(() =>
-              (
-                characterDeleteButton.current || addCharacterButton.current
-              )?.focus({ preventScroll: true }),
-            );
-          }}
         />
       </div>
       <div className="character-name-fields">
@@ -1101,7 +1132,7 @@ export default function App() {
                   : 'CONTENTS'}
             </span>
             <button
-              className="icon-button"
+              className="icon-button add-section-control"
               aria-label={
                 view === 'characters'
                   ? 'Add character'
@@ -1110,6 +1141,11 @@ export default function App() {
                     : 'Add section'
               }
               disabled={readOnly}
+              title={
+                view === 'characters' || view === 'notes'
+                  ? undefined
+                  : 'Add chapter. Right-click or press Shift+F10 for prologue or epilogue.'
+              }
               onClick={() =>
                 view === 'characters'
                   ? makeCharacter()
@@ -1119,6 +1155,7 @@ export default function App() {
               }
             >
               <Plus size={16} />
+              {view !== 'characters' && view !== 'notes' && addSectionMenu()}
             </button>
           </div>
           <div
@@ -1170,6 +1207,11 @@ export default function App() {
                   }}
                 >
                   <GripVertical size={12} className="list-grip" />
+                  <EntryMenu
+                    {...characterMenu(c)}
+                    contextOnly
+                    contextSelector=".simple-list-item"
+                  />
                   <span className="avatar mini">{c.name.slice(0, 1)}</span>
                   <span>
                     {c.name || 'Unnamed character'}
@@ -1207,6 +1249,11 @@ export default function App() {
                   }}
                 >
                   <div className="chapter-row">
+                    <EntryMenu
+                      {...sectionMenu(c)}
+                      contextOnly
+                      contextSelector=".chapter-item"
+                    />
                     <span className="chapter-drag">
                       <GripVertical size={12} />
                     </span>
@@ -1528,13 +1575,15 @@ export default function App() {
                   <h1>Outline</h1>
                 </div>
                 <button
-                  className="primary-button"
+                  className="primary-button add-section-control"
                   disabled={readOnly}
                   onClick={() => open('newChapter')}
                   ref={addSectionButton}
+                  title="Add chapter. Right-click or press Shift+F10 for prologue or epilogue."
                 >
                   <Plus size={16} />
                   Add section
+                  {addSectionMenu()}
                 </button>
               </div>
               <div className="outline-summary">
@@ -1591,31 +1640,7 @@ export default function App() {
                     }}
                   >
                     <div className="outline-card-top">
-                      <select
-                        className="section-kind-select"
-                        aria-label={'Section type for ' + c.title}
-                        title="Chapter, prologue or epilogue"
-                        value={c.kind}
-                        disabled={readOnly}
-                        onChange={(e) =>
-                          mutate((b) => ({
-                            ...b,
-                            chapters: changeChapterKind(
-                              b.chapters,
-                              c.id,
-                              e.target.value as ChapterKind,
-                            ),
-                          }))
-                        }
-                      >
-                        {chapterKinds.map((kind) => (
-                          <option key={kind} value={kind}>
-                            {kind === 'chapter' && c.kind === 'chapter'
-                              ? chapterLabel(book.chapters, c, true)
-                              : chapterKindNames[kind]}
-                          </option>
-                        ))}
-                      </select>
+                      <span>{chapterLabel(book.chapters, c, true)}</span>
                       <GripVertical size={16} />
                     </div>
                     <button
@@ -1687,10 +1712,8 @@ export default function App() {
                           <ArrowDown size={15} />
                         </button>
                         <EntryMenu
-                          label={c.title || 'Section'}
-                          disabled={readOnly}
-                          deleteDisabled={book.chapters.length === 1}
-                          onDelete={() => removeChapter(c.id)}
+                          {...sectionMenu(c)}
+                          contextSelector=".outline-card"
                         />
                       </div>
                     </div>
@@ -1756,6 +1779,11 @@ export default function App() {
                         }}
                       >
                         <GripVertical size={13} className="list-grip" />
+                        <EntryMenu
+                          {...characterMenu(c)}
+                          contextOnly
+                          contextSelector=".character-card"
+                        />
                         <span className="avatar mini">
                           {c.name.slice(0, 1) || '?'}
                         </span>
@@ -1821,6 +1849,7 @@ export default function App() {
                       }
                     />
                     <EntryMenu
+                      contextSelector=".note-editor"
                       triggerRef={noteMenuButton}
                       label={note.title || 'Note'}
                       disabled={readOnly}
@@ -2061,6 +2090,13 @@ export default function App() {
                           <small>{n.status}</small>
                         </span>
                         <ChevronRight size={13} />
+                        <EntryMenu
+                          label={n.title || 'Note'}
+                          disabled={readOnly}
+                          onDelete={() => deleteNote(n.id)}
+                          contextOnly
+                          contextSelector=".linked-note"
+                        />
                       </button>
                     ))}
                   </div>
@@ -2083,6 +2119,7 @@ export default function App() {
                           <ArrowRight size={13} />
                         </button>
                         <EntryMenu
+                          contextSelector=".context-note"
                           triggerRef={noteMenuButton}
                           label={contextNote.title || 'Note'}
                           disabled={readOnly}
@@ -2294,7 +2331,7 @@ export default function App() {
             (
               {
                 newBook: 'New book',
-                newChapter: 'Add to outline',
+                newChapter: 'New ' + formKind,
                 export: 'Export project',
                 settings: 'Book details',
                 trash: 'Recently removed',
@@ -2338,28 +2375,6 @@ export default function App() {
                 setModal(null);
               }}
             >
-              {modal === 'newChapter' && (
-                <label>
-                  Section type
-                  <select
-                    value={formKind}
-                    onChange={(e) => {
-                      const kind = e.target.value as ChapterKind;
-                      setFormKind(kind);
-                      if (!formTitle.trim() || formTitle === suggestedTitle)
-                        setFormTitle(
-                          kind === 'chapter' ? '' : chapterKindNames[kind],
-                        );
-                    }}
-                  >
-                    {chapterKinds.map((kind) => (
-                      <option key={kind} value={kind}>
-                        {chapterKindNames[kind]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
               <label>
                 {modal === 'newBook' ? 'Working title' : 'Title'}
                 <input
@@ -2896,7 +2911,10 @@ export default function App() {
                 the chapter saved. Click Outline in the breadcrumb to return to
                 the chapter summaries. Use the chapter picker or arrows to
                 switch chapters, and Read book for the complete draft. Reorder
-                chapters by dragging or using the arrows in Outline.
+                chapters by dragging or using the arrows in Outline. Click Add
+                section for a chapter; right-click it for a prologue or
+                epilogue. Right-click an entry for its actions, including
+                Delete. Shift+F10 opens the same menu by keyboard.
               </p>
               <p>
                 <strong>Characters.</strong> Add a character and their aliases.

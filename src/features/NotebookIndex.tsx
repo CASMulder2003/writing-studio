@@ -273,6 +273,7 @@ export function NotebookIndex({
                       </span>
                     </button>
                     <EntryMenu
+                      contextSelector=".notebook-list-row"
                       label={note.title || 'Note'}
                       disabled={readOnly}
                       onDelete={() => onDelete(note.id)}
