@@ -48,5 +48,25 @@ export function useChapterTabs(book: Book | undefined) {
       setByProject((current) => ({ ...current, [book.id]: remaining }));
       return remaining[Math.max(0, index - 1)];
     },
+    keepOnly(chapterId: string) {
+      if (!book || !ids.includes(chapterId)) return;
+      setByProject((current) => ({ ...current, [book.id]: [chapterId] }));
+    },
+    closeAll() {
+      if (!book) return;
+      setByProject((current) => ({ ...current, [book.id]: [] }));
+    },
+    move(chapterId: string, targetId: string) {
+      if (
+        !book ||
+        chapterId === targetId ||
+        !ids.includes(chapterId) ||
+        !ids.includes(targetId)
+      )
+        return;
+      const reordered = ids.filter((id) => id !== chapterId);
+      reordered.splice(ids.indexOf(targetId), 0, chapterId);
+      setByProject((current) => ({ ...current, [book.id]: reordered }));
+    },
   };
 }

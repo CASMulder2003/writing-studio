@@ -93,6 +93,7 @@ export function EntryMenu({
         ? node.closest<HTMLElement>('button, [tabindex]')
         : null) ||
       trigger.current ||
+      target.querySelector<HTMLElement>('button, [tabindex]') ||
       target;
     const context = (event: MouseEvent) => {
       if (editable(event.target)) return;

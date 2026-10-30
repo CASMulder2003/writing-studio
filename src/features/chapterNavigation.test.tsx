@@ -86,11 +86,45 @@ describe('chapter navigation without changing the manuscript', () => {
     expect(fallback.result.current.ids).toEqual([]);
   });
 
+  it('reorders and clears a project’s working tabs without changing its book order or another project', () => {
+    const book = newBook('Draft'),
+      other = newBook('Other');
+    book.chapters.push(newChapter('Second'), newChapter('Third'));
+    const original = JSON.stringify(book);
+    const { result, rerender } = renderHook(
+      ({ book }) => useChapterTabs(book),
+      { initialProps: { book } },
+    );
+    act(() => {
+      book.chapters.forEach((c) => result.current.open(book.id, c.id));
+      result.current.open(other.id, other.chapters[0].id);
+    });
+    act(() => result.current.move(book.chapters[2].id, book.chapters[0].id));
+    expect(result.current.ids).toEqual([
+      book.chapters[2].id,
+      book.chapters[0].id,
+      book.chapters[1].id,
+    ]);
+    expect(
+      JSON.parse(localStorage.getItem('writing-studio-chapter-tabs')!)[book.id],
+    ).toEqual(result.current.ids);
+    act(() => result.current.keepOnly(book.chapters[1].id));
+    expect(result.current.ids).toEqual([book.chapters[1].id]);
+    act(() => result.current.closeAll());
+    expect(result.current.ids).toEqual([]);
+    rerender({ book: other });
+    expect(result.current.ids).toEqual([other.chapters[0].id]);
+    expect(JSON.stringify(book)).toBe(original);
+  });
+
   it('supports keyboard switching and a close button that does not reopen the chapter', () => {
     const chapter = newChapter('Prologue', 'prologue');
     const second = newChapter('Arrival');
     const onOpen = vi.fn(),
-      onClose = vi.fn();
+      onClose = vi.fn(),
+      onCloseOthers = vi.fn(),
+      onCloseAll = vi.fn(),
+      onMove = vi.fn();
     render(
       <ChapterTabs
         chapters={[
@@ -100,6 +134,9 @@ describe('chapter navigation without changing the manuscript', () => {
         activeId={chapter.id}
         onOpen={onOpen}
         onClose={onClose}
+        onCloseOthers={onCloseOthers}
+        onCloseAll={onCloseAll}
+        onMove={onMove}
       />,
     );
     const tab = screen.getByRole('tab', { name: 'Prologue' });
@@ -116,6 +153,33 @@ describe('chapter navigation without changing the manuscript', () => {
       screen.getByRole('button', { name: 'Close chapter tab: Prologue' }),
     );
     expect(onClose).toHaveBeenCalledWith(chapter.id);
+    expect(onOpen).not.toHaveBeenCalled();
+    const dragData: Record<string, string> = {};
+    const transfer = {
+      types: ['application/x-writing-studio-tab'],
+      setData: (key: string, value: string) => {
+        dragData[key] = value;
+      },
+      getData: (key: string) => dragData[key],
+    };
+    fireEvent.dragStart(tab, { dataTransfer: transfer });
+    const destination = screen.getByRole('tab', { name: '1. Arrival' });
+    expect(fireEvent.dragOver(destination, { dataTransfer: transfer })).toBe(
+      false,
+    );
+    fireEvent.drop(destination, { dataTransfer: transfer });
+    expect(onMove).toHaveBeenCalledWith(chapter.id, second.id);
+    fireEvent.contextMenu(screen.getByRole('tab', { name: '1. Arrival' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close other tabs' }));
+    expect(onCloseOthers).toHaveBeenCalledWith(second.id);
+    fireEvent.contextMenu(tab);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move tab right' }));
+    expect(onMove).toHaveBeenCalledWith(chapter.id, second.id);
+    fireEvent.contextMenu(tab);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close all tabs' }));
+    expect(onCloseAll).toHaveBeenCalledOnce();
+    fireEvent(tab, new MouseEvent('auxclick', { bubbles: true, button: 1 }));
+    expect(onClose).toHaveBeenLastCalledWith(chapter.id);
     expect(onOpen).not.toHaveBeenCalled();
   });
 });

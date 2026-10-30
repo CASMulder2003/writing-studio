@@ -16,8 +16,6 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronLeft,
-  ArrowUp,
-  ArrowDown,
   Trash2,
   X,
   Check,
@@ -87,6 +85,7 @@ import { ProjectChooser } from '../features/ProjectChooser';
 import { Manuscript } from '../features/Manuscript';
 import { ChapterTabs } from '../features/ChapterTabs';
 import { useChapterTabs } from '../features/useChapterTabs';
+import { useWritingPosition } from '../features/useWritingPosition';
 import { readImage } from '../shared/images';
 
 type View = 'write' | 'outline' | 'characters' | 'notes' | 'read';
@@ -224,7 +223,14 @@ export default function App() {
   const outlineScroll = useRef<HTMLDivElement>(null);
   const outlinePositions = useRef<Record<string, number>>({});
   const [manuscriptJump, setManuscriptJump] = useState({ id: '', request: 0 });
-  const editorScroll = useRef<HTMLDivElement>(null);
+  const writingPositionKey = `${book?.id}:${scene?.id}`;
+  const writingPosition = useWritingPosition(
+    writingPositionKey,
+    view === 'write',
+  );
+  const writingSelections = useRef<
+    Record<string, { from: number; to: number }>
+  >({});
   const [inspector, setInspector] = useState(() => window.innerWidth > 1100);
   const [inspectorTab, setInspectorTab] = useState<
     'scene' | 'character' | 'history'
@@ -327,10 +333,6 @@ export default function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const bookRef = useRef<Book | undefined>(book);
   bookRef.current = book;
-  useEffect(() => {
-    if (view === 'write' && editorScroll.current)
-      editorScroll.current.scrollTop = 0;
-  }, [scene?.id, view]);
   useEffect(() => {
     if (view === 'outline' && outlineScroll.current && book)
       outlineScroll.current.scrollTop = outlinePositions.current[book.id] || 0;
@@ -1032,6 +1034,17 @@ export default function App() {
           activeId={view === 'write' ? chapter.id : undefined}
           onOpen={(target) => chooseScene(target.scenes[0].id)}
           onClose={closeChapterTab}
+          onCloseOthers={(id) => {
+            chapterTabs.keepOnly(id);
+            const target = book.chapters.find((c) => c.id === id);
+            if (target) chooseScene(target.scenes[0].id);
+          }}
+          onCloseAll={() => {
+            chapterTabs.closeAll();
+            if (view === 'write') showOutline();
+            requestAnimationFrame(() => outlineLink.current?.focus());
+          }}
+          onMove={chapterTabs.move}
         />
         <div className="header-actions">
           <span
@@ -1486,7 +1499,12 @@ export default function App() {
           </div>
           {view === 'write' && (
             <>
-              <div className="editor-scroll" ref={editorScroll}>
+              <div
+                className="editor-scroll"
+                key={writingPositionKey}
+                ref={writingPosition.container}
+                onScroll={writingPosition.onScroll}
+              >
                 <div className="chapter-heading">
                   <div className="chapter-kicker">
                     {chapterLabel(book.chapters, chapter, true).toUpperCase()}
@@ -1515,6 +1533,12 @@ export default function App() {
                 </div>
                 <div className="paper">
                   <Writer
+                    initialSelection={
+                      writingSelections.current[writingPositionKey]
+                    }
+                    onSelectionChange={(selection) => {
+                      writingSelections.current[writingPositionKey] = selection;
+                    }}
                     key={scene.id + '-' + editorVersion}
                     scene={scene}
                     size={pageSize}
@@ -1686,36 +1710,11 @@ export default function App() {
                       >
                         Open {c.kind}
                       </button>
-                      <div>
-                        <button
-                          className="icon-button"
-                          aria-label={'Move ' + c.title + ' up'}
-                          disabled={
-                            i === 0 ||
-                            book.chapters[i - 1].kind !== c.kind ||
-                            readOnly
-                          }
-                          onClick={() => moveChapter(c.id, i - 1)}
-                        >
-                          <ArrowUp size={15} />
-                        </button>
-                        <button
-                          className="icon-button"
-                          aria-label={'Move ' + c.title + ' down'}
-                          disabled={
-                            i === book.chapters.length - 1 ||
-                            book.chapters[i + 1].kind !== c.kind ||
-                            readOnly
-                          }
-                          onClick={() => moveChapter(c.id, i + 1)}
-                        >
-                          <ArrowDown size={15} />
-                        </button>
-                        <EntryMenu
-                          {...sectionMenu(c)}
-                          contextSelector=".outline-card"
-                        />
-                      </div>
+                      <EntryMenu
+                        {...sectionMenu(c)}
+                        contextOnly
+                        contextSelector=".outline-card"
+                      />
                     </div>
                   </article>
                 ))}
@@ -2911,7 +2910,7 @@ export default function App() {
                 the chapter saved. Click Outline in the breadcrumb to return to
                 the chapter summaries. Use the chapter picker or arrows to
                 switch chapters, and Read book for the complete draft. Reorder
-                chapters by dragging or using the arrows in Outline. Click Add
+                chapters by dragging or using their right-click menus. Click Add
                 section for a chapter; right-click it for a prologue or
                 epilogue. Right-click an entry for its actions, including
                 Delete. Shift+F10 opens the same menu by keyboard.
@@ -2942,7 +2941,10 @@ export default function App() {
               <p>
                 <strong>Projects.</strong> Use the project name at the top to
                 switch projects, create one, or close the current project. Each
-                project keeps its own open chapter tabs.
+                project keeps its own open chapter tabs. Drag tabs to arrange
+                your working order, or right-click one to close other tabs. Tab
+                order is separate from book order. Switching chapters restores
+                your position during this visit.
               </p>
               <button
                 className="secondary-button"

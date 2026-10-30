@@ -6,12 +6,13 @@ Built with React, TypeScript, and Tiptap; runs locally or as a static GitHub Pag
 ## Workspace
 
 - Switch projects from the project name at the top. Open chapters from Outline into closable tabs; each project remembers its tabs.
+- Drag tabs into a useful working order without rearranging the book. Right-click a tab to close it, close other/all tabs, or move it by keyboard. Middle-click also closes a tab. Switching chapters restores the scroll position and text selection during the current visit.
 - Write and reorder chapters, add summaries, and track Planned, Drafting, Revising, and Complete status.
-- Click Add section for a chapter; right-click it (or press Shift+F10) for an unnumbered prologue or epilogue. Change an existing section's type through its right-click or ⋯ menu. Chapter counts exclude these sections; word and page totals include them.
+- Click Add section for a chapter; right-click it (or press Shift+F10) for an unnumbered prologue or epilogue. Change an existing section's type through its right-click menu. Chapter counts exclude these sections; word and page totals include them.
 - See chapter and book word counts and formatted page counts, without targets or reading-time goals.
 - Keep compact character profiles with first, last, optional middle names, and aliases. Click highlighted full names or unique first names to open their profiles.
 - Arrange characters by dragging their names, or use Move up/down in their ⋯ menu.
-- Right-click character names, notes, or outline sections for their actions, or use their ⋯ menus. Delete entries and restore them from Recently removed. Deleting a profile leaves manuscript text intact. Text fields retain their usual browser context menus.
+- Right-click character names, notes, or outline sections for their actions. Characters and notes also have ⋯ menus; chapter cards keep their actions in the right-click menu. Delete entries and restore them from Recently removed. Deleting a profile leaves manuscript text intact. Text fields retain their usual browser context menus.
 - Write standalone notes or attach them to chapters. Browse grouped previews, search note content, and filter by chapter or status. Drag notes to reorder them or move them onto another chapter group. Add images, captions, and drawings.
 - Write on scrolling book-sized pages, or switch to Continuous in the formatting toolbar. The toolbar stays visible as you scroll.
 - Use rich text, manuscript images, focus mode, search, and a paginated reading view that shares the PDF layout.

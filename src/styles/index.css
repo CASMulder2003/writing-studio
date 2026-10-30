@@ -1176,15 +1176,8 @@ strong {
   align-items: center;
   justify-content: space-between;
 }
-.outline-controls > div {
-  display: flex;
-}
 .outline-controls .text-button {
   font-size: 11px;
-}
-.outline-controls .icon-button {
-  width: 27px;
-  height: 27px;
 }
 .empty-state {
   max-width: 440px;

@@ -34,6 +34,8 @@ export function Writer({
   chapterTitle,
   chapterLabel,
   onPages,
+  initialSelection,
+  onSelectionChange,
 }: {
   scene: Scene;
   characters: Character[];
@@ -44,6 +46,8 @@ export function Writer({
   chapterTitle: string;
   chapterLabel: string;
   onPages: (pages: number) => void;
+  initialSelection?: { from: number; to: number };
+  onSelectionChange: (selection: { from: number; to: number }) => void;
 }) {
   const imageInput = useRef<HTMLInputElement>(null);
   const [imageError, setImageError] = useState('');
@@ -54,8 +58,14 @@ export function Writer({
       return true;
     }
   });
-  const current = useRef({ characters, onChange, onCharacter });
-  current.current = { characters, onChange, onCharacter };
+  const savedSelection = useRef(initialSelection);
+  const current = useRef({
+    characters,
+    onChange,
+    onCharacter,
+    onSelectionChange,
+  });
+  current.current = { characters, onChange, onCharacter, onSelectionChange };
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -105,6 +115,19 @@ export function Writer({
     },
     onUpdate: ({ editor }) =>
       current.current.onChange(editor.getJSON() as DocNode),
+    onCreate: ({ editor }) => {
+      const selection = savedSelection.current;
+      if (selection)
+        editor.commands.setTextSelection({
+          from: Math.min(selection.from, editor.state.doc.content.size),
+          to: Math.min(selection.to, editor.state.doc.content.size),
+        });
+    },
+    onSelectionUpdate: ({ editor }) =>
+      current.current.onSelectionChange({
+        from: editor.state.selection.from,
+        to: editor.state.selection.to,
+      }),
   });
   useEffect(() => {
     if (editor)

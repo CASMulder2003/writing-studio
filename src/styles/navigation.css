@@ -62,6 +62,16 @@
   background: #f5f6f0;
   border-color: var(--border);
 }
+.chapter-tab.dragging {
+  opacity: 0.45;
+}
+.chapter-tab.tab-drop-target {
+  box-shadow: inset 2px 0 #79936c;
+  background: #e8eee2;
+}
+.chapter-tab > [role='tab'] > * {
+  pointer-events: none;
+}
 .chapter-tab > [role='tab'] {
   display: flex;
   align-items: center;

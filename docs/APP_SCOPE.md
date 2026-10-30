@@ -5,7 +5,7 @@ The main unit of the manuscript is a chapter. A short story or poem can use a si
 chapter without adopting novel-length goals.
 Prologues and epilogues are unnumbered sections placed before and after the
 numbered chapters. Their words and pages contribute to the book totals. The
-outline's right-click or ⋯ menu can convert existing writing without losing its
+outline's right-click menu can convert existing writing without losing its
 content or linked notes. Older projects recognise exact Prologue/Epilogue titles;
 explicit section types always take precedence.
 
@@ -21,7 +21,9 @@ from Recently removed. Removing a profile clears its links without editing the
 manuscript. Removed profiles remain in local storage and complete project backups.
 Characters can be dragged into a preferred order, with keyboard Move up/down actions
 in their options menu. Delete actions for profiles, notes and outline sections live
-in right-click and ⋯ menus with keyboard navigation and Escape dismissal. Add section
+in right-click menus with keyboard navigation and Escape dismissal; character and note
+menus also have visible ⋯ triggers. Chapter cards use drag ordering and right-click
+actions without extra arrow or ⋯ buttons. Add section
 opens a chapter form on left-click; right-click or Shift+F10 offers Prologue and Epilogue.
 Editable text fields preserve the browser's spelling, copy and paste context menus.
 
@@ -38,6 +40,10 @@ The project switcher opens the saved-project library and supports creating or cl
 a project. Projects open in Outline. Chapter tabs represent open editors; closing a
 tab preserves its manuscript. Each project keeps its own open tabs, and breadcrumbs
 provide a direct return to the outline.
+Tabs have their own saved order, separate from manuscript order. Drag or use the tab
+context menu to rearrange them; the same menu can close one, other, or all tabs.
+Middle-click closes a tab. Scroll positions and text selections are remembered per
+project/chapter during the current visit, including while book pages finish laying out.
 
 Automatic local saving, manual chapter versions, recovery of removed chapters,
 complete JSON backups, and validated imports protect the writing workflow. Selected
