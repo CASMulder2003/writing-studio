@@ -33,19 +33,12 @@ export function NotebookIndex({
   onMove: (id: string, chapterId: string | null, beforeId?: string) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [attachment, setAttachment] = useState('all');
-  const [status, setStatus] = useState('all');
   const [closed, setClosed] = useState<string[]>([]);
   const [dragging, setDragging] = useState('');
   const [dropTarget, setDropTarget] = useState('');
   const list = useRef<HTMLDivElement>(null);
-  const clear = () => {
-    setQuery('');
-    setAttachment('all');
-    setStatus('all');
-  };
   useEffect(() => {
-    clear();
+    setQuery('');
     setClosed([]);
   }, [resetKey]);
   useEffect(() => {
@@ -77,15 +70,11 @@ export function NotebookIndex({
       : book.chapters.some((c) => c.id === note.chapterId)
         ? note.chapterId
         : 'removed';
-  const matching = book.notes.filter(
-    (note) =>
-      (attachment === 'all' || groupId(note) === attachment) &&
-      (status === 'all' || note.status === status) &&
-      `${note.title}\n${note.body}\n${note.images.map((image) => image.name).join(' ')}`
-        .toLocaleLowerCase()
-        .includes(query.trim().toLocaleLowerCase()),
+  const matching = book.notes.filter((note) =>
+    `${note.title}\n${note.body}\n${note.images.map((image) => image.name).join(' ')}`
+      .toLocaleLowerCase()
+      .includes(query.trim().toLocaleLowerCase()),
   );
-  const filtered = Boolean(query || attachment !== 'all' || status !== 'all');
   const drop = (
     event: DragEvent,
     chapterId: string | null,
@@ -105,7 +94,7 @@ export function NotebookIndex({
   };
   return (
     <div className="notebook-index">
-      <div className="notebook-filters">
+      <div className="notebook-search-bar">
         <div className="note-search">
           <Search size={14} />
           <input
@@ -132,49 +121,11 @@ export function NotebookIndex({
             </button>
           )}
         </div>
-        <select
-          aria-label="Filter notes by chapter"
-          value={attachment}
-          onChange={(e) => setAttachment(e.target.value)}
-        >
-          <option value="all">All notes</option>
-          {groups
-            .filter(
-              (g) =>
-                g.id !== 'removed' ||
-                book.notes.some((n) => groupId(n) === 'removed'),
-            )
-            .map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.title}
-              </option>
-            ))}
-        </select>
-        <div className="note-filter-row">
-          <select
-            aria-label="Filter notes by status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="all">All statuses</option>
-            {['Idea', 'Planned', 'In progress', 'Resolved'].map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-          <span>
-            {matching.length} of {book.notes.length}
-          </span>
-          {filtered && (
-            <button className="text-button" onClick={clear}>
-              Reset
-            </button>
-          )}
-        </div>
       </div>
       <div className="notebook-note-list" ref={list} aria-label="Notes">
         {groups.map((group) => {
           const notes = matching.filter((n) => groupId(n) === group.id);
-          if (!notes.length && attachment !== group.id) return null;
+          if (!notes.length) return null;
           return (
             <section
               key={group.id}
@@ -298,7 +249,7 @@ export function NotebookIndex({
         {!matching.length && (
           <p className="note-list-empty">
             {book.notes.length
-              ? 'No notes match these filters.'
+              ? 'No notes match your search.'
               : 'Your notes will appear here.'}
           </p>
         )}

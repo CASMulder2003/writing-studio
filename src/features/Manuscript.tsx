@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
-import type { Book } from '../domain/book';
+import { chapterNumber, chapterOpening, type Book } from '../domain/book';
 import type { BookPage, BookPreview } from './bookPdf';
 import { bookDimensions, mmToPx, ptToMm, type BookSize } from './bookFormat';
 import { usePageScale } from './usePageScale';
+import { EditablePageTitle } from './EditablePageTitle';
 
 function PreviewPage({
   page,
@@ -103,27 +104,34 @@ export function Manuscript({
   book,
   jump,
   onEdit,
+  onRename,
+  readOnly,
   size,
   onPageCounts,
 }: {
   book: Book;
   jump: { id: string; request: number };
   onEdit: (sceneId: string) => void;
+  onRename: (chapterId: string, title: string) => void;
+  readOnly: boolean;
   size: BookSize;
   onPageCounts: (counts: Record<string, number>, size: BookSize) => void;
 }) {
   const [preview, setPreview] = useState<BookPreview>();
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
+  const [updating, setUpdating] = useState(false);
   const { width } = bookDimensions(size);
   const { container, scale } = usePageScale(mmToPx(width), 'fit');
   const chapters = useRef(new Map<string, HTMLElement>());
   const scroller = useRef<HTMLDivElement>(null);
+  const lastJump = useRef('');
+  const renameAnchor = useRef<{ id: string; top: number } | null>(null);
   const onCounts = useRef(onPageCounts);
   onCounts.current = onPageCounts;
   useEffect(() => {
     let cancelled = false;
-    setPreview(undefined);
+    setUpdating(true);
     setError('');
     import('./bookPdf')
       .then(({ createBookPreview }) =>
@@ -132,6 +140,7 @@ export function Manuscript({
       .then((result) => {
         if (cancelled) return;
         setPreview(result);
+        setUpdating(false);
         const counts: Record<string, number> = {};
         for (const page of result.pages)
           if (page.chapterId)
@@ -139,32 +148,47 @@ export function Manuscript({
         onCounts.current(counts, size);
       })
       .catch((error) => {
-        if (!cancelled)
+        if (!cancelled) {
+          setUpdating(false);
           setError(
             error instanceof Error
               ? error.message
               : 'The book preview could not be prepared.',
           );
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [book, size, retry]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const target = chapters.current.get(jump.id);
     const scroll = scroller.current;
-    if (preview && target && scroll)
+    if (!preview || !scroll) return;
+    const request = `${jump.id}:${jump.request}`;
+    if (target && lastJump.current !== request) {
+      lastJump.current = request;
+      renameAnchor.current = null;
       scroll.scrollTop +=
         target.getBoundingClientRect().top -
         scroll.getBoundingClientRect().top -
         12;
+    } else if (renameAnchor.current) {
+      const anchor = renameAnchor.current;
+      const section = chapters.current.get(anchor.id);
+      if (section)
+        scroll.scrollTop += section.getBoundingClientRect().top - anchor.top;
+      renameAnchor.current = null;
+    }
   }, [preview, jump.id, jump.request]);
   return (
     <div className="book-reader">
       <div className="book-view-toolbar">
         <span>
           {preview
-            ? `${preview.pages.length} pages · including 2 front pages`
+            ? updating
+              ? 'Updating book…'
+              : `${preview.pages.length} pages · including 2 front pages`
             : 'Preparing book…'}
         </span>
         <span>6 × 9 in · standard PDF layout</span>
@@ -217,14 +241,47 @@ export function Manuscript({
                         </button>
                       </div>
                     )}
-                    <PreviewPage
-                      eager={
-                        i < 3 || Boolean(opening && chapter.id === jump.id)
-                      }
-                      page={page}
-                      width={preview.width}
-                      height={preview.height}
-                    />
+                    <div className="book-page-content">
+                      <PreviewPage
+                        eager={
+                          i < 3 || Boolean(opening && chapter.id === jump.id)
+                        }
+                        page={page}
+                        width={preview.width}
+                        height={preview.height}
+                      />
+                      {chapter && page.titleRegion && !readOnly && (
+                        <div
+                          className="book-page-title-overlay"
+                          style={{
+                            left: mmToPx(page.titleRegion.x),
+                            top: mmToPx(page.titleRegion.y),
+                            width: mmToPx(page.titleRegion.width),
+                            minHeight: mmToPx(page.titleRegion.height),
+                          }}
+                        >
+                          <EditablePageTitle
+                            value={chapter.title}
+                            displayTitle={
+                              chapterOpening(
+                                chapter,
+                                chapterNumber(book.chapters, chapter.id),
+                              ).title
+                            }
+                            overlay
+                            onSave={(title) => {
+                              const section = chapters.current.get(chapter.id);
+                              if (section)
+                                renameAnchor.current = {
+                                  id: chapter.id,
+                                  top: section.getBoundingClientRect().top,
+                                };
+                              onRename(chapter.id, title);
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </section>
                 );
               })}

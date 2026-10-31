@@ -76,6 +76,58 @@
   font-kerning: none;
   font-variant-ligatures: none;
 }
+.book-page-content {
+  position: relative;
+}
+.book-page-title-overlay {
+  position: absolute;
+  font:
+    18pt/7.5mm 'Book Crimson',
+    Georgia,
+    serif;
+  text-align: center;
+}
+.editable-page-title {
+  pointer-events: auto;
+  min-height: inherit;
+}
+.editable-page-title > button,
+.editable-page-title > textarea {
+  display: block;
+  width: 100%;
+  min-height: inherit;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  font: inherit;
+  letter-spacing: inherit;
+  color: #141414;
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: transparent;
+}
+.editable-page-title > button[hidden] {
+  display: none;
+}
+.editable-page-title > button {
+  cursor: text;
+}
+.editable-page-title > button:hover,
+.editable-page-title > button:focus-visible {
+  outline: 1px dashed #91a587;
+  outline-offset: 4px;
+}
+.editable-page-title > textarea {
+  background: #fff;
+  outline: 1px solid #91a587;
+  outline-offset: 4px;
+  resize: none;
+  overflow: hidden;
+}
+.over-printed-title > button > span {
+  visibility: hidden;
+}
 .book-chapter-action {
   display: flex;
   align-items: center;

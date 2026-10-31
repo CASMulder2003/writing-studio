@@ -14,6 +14,7 @@ import {
   type BookSize,
 } from './bookFormat';
 import { usePageScale } from './usePageScale';
+import { EditablePageTitle } from './EditablePageTitle';
 
 export const PAGE_GAP = 28;
 // CSS Shapes reserve the bottom/top margins between pages. The editable
@@ -48,6 +49,9 @@ export function WritingPages({
   paged,
   chapterTitle,
   chapterLabel,
+  titleValue,
+  onTitleChange,
+  readOnly,
   onPages,
 }: {
   editor: Editor;
@@ -57,6 +61,9 @@ export function WritingPages({
   paged: boolean;
   chapterTitle: string;
   chapterLabel: string;
+  titleValue: string;
+  onTitleChange: (title: string) => void;
+  readOnly: boolean;
   onPages: (pages: number) => void;
 }) {
   const dimensions = bookDimensions(size);
@@ -152,9 +159,16 @@ export function WritingPages({
             ))}
           </div>
         )}
-        <div className="writing-chapter-opening" aria-hidden="true">
+        <div className="writing-chapter-opening">
           <span>{chapterLabel || '\u00a0'}</span>
-          <div ref={heading}>{chapterTitle || 'Untitled chapter'}</div>
+          <div ref={heading}>
+            <EditablePageTitle
+              value={titleValue}
+              displayTitle={chapterTitle || 'Untitled chapter'}
+              readOnly={readOnly}
+              onSave={onTitleChange}
+            />
+          </div>
         </div>
         <div
           ref={flow}

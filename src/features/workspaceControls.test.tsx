@@ -92,7 +92,7 @@ describe('workspace menus and notebook navigation', () => {
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     expect(document.activeElement).toBe(trigger);
   });
-  it('finds notes by their contents, combines filters, and offers explicit keyboard reordering', () => {
+  it('finds notes by their contents and offers explicit keyboard reordering', () => {
     const book = newBook();
     const note = (
       id: string,
@@ -133,15 +133,11 @@ describe('workspace menus and notebook navigation', () => {
     expect(
       screen.queryByRole('button', { name: 'Open note: Ending' }),
     ).toBeNull();
-    fireEvent.change(
-      screen.getByRole('combobox', { name: 'Filter notes by status' }),
-      { target: { value: 'Planned' } },
-    );
     fireEvent.click(
       screen.getByRole('button', { name: 'Open note: Question' }),
     );
     expect(onOpen).toHaveBeenCalledWith(book.notes[1]);
-    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear note search' }));
     fireEvent.click(screen.getByRole('button', { name: 'Question options' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Move up' }));
     expect(onMove).toHaveBeenCalledWith('Question', null, 'Clue');

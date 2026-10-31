@@ -52,6 +52,7 @@ export type PageElement =
     };
 export type BookPage = {
   chapterId?: string;
+  titleRegion?: { x: number; y: number; width: number; height: number };
   number?: number;
   elements: PageElement[];
 };
@@ -297,6 +298,12 @@ async function buildBook(
     doc.setTextColor(20);
     doc.setFontSize(18);
     const titles = doc.splitTextToSize(opening.title, textWidth) as string[];
+    pages[pages.length - 1].titleRegion = {
+      x: (width - textWidth) / 2,
+      y: 40,
+      width: textWidth,
+      height: Math.max(1, titles.length) * 7.5,
+    };
     y = 46;
     for (const title of titles) {
       text(title, width / 2, y, { align: 'center' });

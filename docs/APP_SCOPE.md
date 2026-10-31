@@ -31,7 +31,7 @@ Notes can stand alone or belong to a chapter; either kind remains visible in the
 Notebook. Notes have planning status and support attached images and simple drawings.
 The manuscript also supports images.
 The notebook groups notes by chapter or Standalone, with collapsible groups, previews,
-content search, and chapter/status filters. Notes can be dragged within a group to
+and content search. Notes can be dragged within a group to
 reorder or onto another group to change their chapter attachment. Keyboard move
 actions are available in note menus. Deleted notes can be recovered intact, including
 images and chapter links, from Recently removed and are retained in project backups.

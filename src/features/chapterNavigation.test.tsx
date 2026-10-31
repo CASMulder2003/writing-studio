@@ -169,6 +169,14 @@ describe('chapter navigation without changing the manuscript', () => {
     );
     fireEvent.drop(destination, { dataTransfer: transfer });
     expect(onMove).toHaveBeenCalledWith(chapter.id, second.id);
+    onMove.mockClear();
+    const closeTarget = screen.getByRole('button', {
+      name: 'Close chapter tab: Arrival',
+    });
+    fireEvent.dragOver(closeTarget, { dataTransfer: transfer });
+    fireEvent.drop(closeTarget, { dataTransfer: transfer });
+    expect(onMove).toHaveBeenCalledExactlyOnceWith(chapter.id, second.id);
+    expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.contextMenu(screen.getByRole('tab', { name: '1. Arrival' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Close other tabs' }));
     expect(onCloseOthers).toHaveBeenCalledWith(second.id);

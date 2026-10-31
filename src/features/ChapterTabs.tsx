@@ -67,6 +67,26 @@ export function ChapterTabs({
       role="tablist"
       aria-label="Open chapters"
       ref={strip}
+      onDragOver={(event) => {
+        if (
+          !event.dataTransfer.types.includes('application/x-writing-studio-tab')
+        )
+          return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < bounds.left + 36)
+          event.currentTarget.scrollLeft -= 18;
+        if (event.clientX > bounds.right - 36)
+          event.currentTarget.scrollLeft += 18;
+      }}
+      onDragLeave={(event) => {
+        if (
+          !(event.relatedTarget instanceof Node) ||
+          !event.currentTarget.contains(event.relatedTarget)
+        )
+          setDropTarget('');
+      }}
       onKeyDown={(event) => {
         if (
           !(event.target instanceof HTMLElement) ||
@@ -108,31 +128,31 @@ export function ChapterTabs({
           onMouseDown={(event) => {
             if (event.button === 1) event.preventDefault();
           }}
+          onDragOver={(event) => {
+            if (
+              event.dataTransfer.types.includes(
+                'application/x-writing-studio-tab',
+              )
+            ) {
+              event.preventDefault();
+              setDropTarget(chapter.id);
+            }
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            const id = event.dataTransfer.getData(
+              'application/x-writing-studio-tab',
+            );
+            if (id) onMove(id, chapter.id);
+            setDragging('');
+            setDropTarget('');
+          }}
         >
           <button
             role="tab"
             aria-selected={activeId === chapter.id}
-            title={chapterListTitle(chapter, number)}
+            title={`${chapterListTitle(chapter, number)} · Drag to reorder tab`}
             draggable
-            onDragOver={(event) => {
-              if (
-                event.dataTransfer.types.includes(
-                  'application/x-writing-studio-tab',
-                )
-              ) {
-                event.preventDefault();
-                setDropTarget(chapter.id);
-              }
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              const id = event.dataTransfer.getData(
-                'application/x-writing-studio-tab',
-              );
-              if (id) onMove(id, chapter.id);
-              setDragging('');
-              setDropTarget('');
-            }}
             onDragStart={(event) => {
               event.dataTransfer.setData(
                 'application/x-writing-studio-tab',

@@ -1544,6 +1544,8 @@ export default function App() {
                     size={pageSize}
                     chapterTitle={openingHeading.title}
                     chapterLabel={openingHeading.label}
+                    titleValue={chapter.title}
+                    onTitleChange={(title) => patchChapter({ title })}
                     onPages={(count) =>
                       setWritingCount((previous) =>
                         previous?.scene === scene.id &&
@@ -2004,6 +2006,8 @@ export default function App() {
               book={book}
               jump={manuscriptJump}
               onEdit={chooseScene}
+              readOnly={readOnly}
+              onRename={(id, title) => patchChapter({ title }, id)}
               size={pageSize}
               onPageCounts={(counts, size) =>
                 setLayoutCounts({ chapters: book.chapters, size, counts })

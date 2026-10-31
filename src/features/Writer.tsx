@@ -33,6 +33,8 @@ export function Writer({
   size,
   chapterTitle,
   chapterLabel,
+  titleValue,
+  onTitleChange,
   onPages,
   initialSelection,
   onSelectionChange,
@@ -45,6 +47,8 @@ export function Writer({
   size: BookSize;
   chapterTitle: string;
   chapterLabel: string;
+  titleValue: string;
+  onTitleChange: (title: string) => void;
   onPages: (pages: number) => void;
   initialSelection?: { from: number; to: number };
   onSelectionChange: (selection: { from: number; to: number }) => void;
@@ -311,6 +315,9 @@ export function Writer({
         paged={paged}
         chapterTitle={chapterTitle}
         chapterLabel={chapterLabel}
+        titleValue={titleValue}
+        onTitleChange={onTitleChange}
+        readOnly={readOnly}
         onPages={onPages}
       >
         <EditorContent editor={editor} />
